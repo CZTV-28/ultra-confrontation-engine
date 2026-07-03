@@ -1,5 +1,7 @@
 # Ultra Confrontation - 超类史诗
 
+Current UCE engine version: `0.1.0`
+
 [中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
 
 Ultra Confrontation is an engineering project that I am developing based on Undertale fan creations and characters from fan games. It is intended for quick, entertaining AI battle simulations, and later it will be connected with the development of Undertale AU Mugen fighting games and other game design work. For that reason, the overall project is called Ultra Confrontation Game, abbreviated below as UC or UCG.

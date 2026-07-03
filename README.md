@@ -1,5 +1,7 @@
 # Ultra Confrontation - 超类史诗
 
+当前 UCE 引擎版本：`0.1.0`
+
 [中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
 
 Ultra Confrontation 是我本人基于 Undertale 同人创作和同人游戏人物为蓝本开发的工程项目，用于一些即时取乐的 AI 战斗模拟，并会在后期并入开发 Undertale AU 的 Mugen 格斗游戏，以及一些其他游戏设计内容，因此统称为 Ultra Confrontation Game（下文简称 UC 或 UCG）。
