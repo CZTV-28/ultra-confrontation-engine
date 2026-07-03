@@ -24,15 +24,15 @@ const pathMap: Record<Page, string> = {
   settings: "/settings",
 };
 
+function getPageFromLocation(): Page {
+  return pageMap[window.location.pathname] || "home";
+}
+
 export default function AppRouter() {
-  const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [currentPage, setCurrentPage] = useState<Page>(() => getPageFromLocation());
 
   useEffect(() => {
-    const currentPath = window.location.pathname;
-    const page = pageMap[currentPath];
-    if (page) {
-      setCurrentPage(page);
-    }
+    setCurrentPage(getPageFromLocation());
   }, []);
 
   const navigateTo = (page: Page) => {
@@ -47,9 +47,7 @@ export default function AppRouter() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname;
-      const page = pageMap[path] || "home";
-      setCurrentPage(page);
+      setCurrentPage(getPageFromLocation());
     };
 
     window.addEventListener("popstate", handlePopState);
