@@ -1,0 +1,14 @@
+{
+  "id": "test_char_b",
+  "name": "测试角色B",
+  "creator": "system",
+  "hp": 500,
+  "mp": 250,
+  "skills": {
+    "melee": "slash",
+    "ranged": "bolt",
+    "block": "basic_block",
+    "dodge": "basic_dodge",
+    "passive": null
+  }
+}

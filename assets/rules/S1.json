@@ -1,0 +1,47 @@
+{
+  "season": "S1",
+  "name": "起源",
+  "match": {
+    "max_rounds": 30,
+    "max_turns_per_round": 30
+  },
+  "arena": {
+    "type": "circle",
+    "radius": 250
+  },
+  "character_defaults": {
+    "max_hp": 500,
+    "max_mp": 250
+  },
+  "skill_constraints": {
+    "basic_attack": {
+      "base_damage": 10,
+      "max_mp_boost": 5
+    },
+    "melee_skill": {
+      "default_mp_cost": 0,
+      "max_mp_cost": 25,
+      "max_damage": 50
+    },
+    "ranged_skill": {
+      "default_mp_cost": 25,
+      "default_damage": 50,
+      "min_mp_cost": 10,
+      "max_mp_cost": 50,
+      "min_damage": 25,
+      "max_damage": 100,
+      "default_hit_rate": 0.6,
+      "min_hit_rate": 0.25,
+      "max_hit_rate": 1.0,
+      "max_knockback": 100
+    },
+    "block_skill": {
+      "default_damage_reduction": 0.5,
+      "max_damage_reduction": 0.75
+    },
+    "dodge_skill": {
+      "default_mp_cost": 50,
+      "retreat_distance": 100
+    }
+  }
+}

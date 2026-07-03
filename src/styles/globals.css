@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+* {
+  cursor: none !important;
+}
+
+*:hover {
+  cursor: none !important;
+}
+
+*:active {
+  cursor: none !important;
+}
+
+button {
+  cursor: none !important;
+}
+
+a {
+  cursor: none !important;
+}
+
+input {
+  cursor: none !important;
+}
+
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'VT323', 'Microsoft YaHei', 'PingFang SC', monospace;
+  background: #000000;
+}
+
+html {
+  overflow: hidden;
+  background: #000000;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

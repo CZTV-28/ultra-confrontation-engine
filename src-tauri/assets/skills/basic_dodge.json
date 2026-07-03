@@ -1,0 +1,7 @@
+{
+  "id": "basic_dodge",
+  "name": "基础闪避",
+  "type": "dodge",
+  "mp_cost": 50,
+  "retreat_distance": 100
+}

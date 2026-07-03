@@ -1,0 +1,7 @@
+{
+  "id": "slash",
+  "name": "斩击",
+  "type": "melee",
+  "mp_cost": 10,
+  "damage": 35
+}

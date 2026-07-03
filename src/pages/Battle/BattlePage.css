@@ -1,0 +1,221 @@
+.battle-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.battle-map {
+  flex-shrink: 0;
+}
+
+.battle-info {
+  flex: 1;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fighter-stats {
+  border: 1px solid #555;
+  padding: 10px;
+}
+
+.fighter-name {
+  color: white;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  color: #aaa;
+  font-size: 12px;
+  width: 24px;
+  text-align: right;
+}
+
+.stat-bar {
+  flex: 1;
+  height: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-bar-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent calc(25% - 1px),
+    rgba(0, 0, 0, 0.4) calc(25% - 1px),
+    rgba(0, 0, 0, 0.4) 25%
+  );
+}
+
+.stat-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.stat-text {
+  color: white;
+  font-size: 11px;
+  width: 80px;
+  text-align: right;
+}
+
+.action-log {
+  margin-top: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #444;
+  padding: 8px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 12px;
+  font-size: 15px;
+  color: #ccc;
+  padding: 3px 0;
+  border-bottom: 1px solid #222;
+}
+
+.log-turn {
+  color: #888;
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.log-action-a {
+  color: #ff4466;
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.log-action-b {
+  color: #4488ff;
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.log-dmg {
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.dmg-a {
+  color: #ff4444;
+  font-weight: bold;
+  font-size: 16px;
+  text-shadow: 0 0 8px rgba(255, 68, 68, 0.8);
+}
+
+.dmg-b {
+  color: #4488ff;
+  font-weight: bold;
+  font-size: 16px;
+  text-shadow: 0 0 8px rgba(68, 136, 255, 0.8);
+}
+
+.screen-shake {
+  animation: shake 0.2s ease-in-out;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-4px, 2px);
+  }
+  40% {
+    transform: translate(4px, -2px);
+  }
+  60% {
+    transform: translate(-2px, -2px);
+  }
+  80% {
+    transform: translate(2px, 2px);
+  }
+}
+
+.damage-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255, 0, 0, 0.08);
+  pointer-events: none;
+  z-index: 100;
+  animation: flash-fade 0.15s ease-out;
+}
+
+@keyframes flash-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.replay-shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+.replay-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+  z-index: 100;
+  animation: flash-fade 0.3s ease-out;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-4px, 2px);
+  }
+  40% {
+    transform: translate(4px, -2px);
+  }
+  60% {
+    transform: translate(-2px, -2px);
+  }
+  80% {
+    transform: translate(2px, 2px);
+  }
+}
+
+@keyframes flash-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

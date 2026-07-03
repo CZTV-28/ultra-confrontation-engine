@@ -1,0 +1,71 @@
+.uc-window {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  position: relative;
+}
+
+.uc-window::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(200, 160, 255, 0.35) 0%,
+    rgba(180, 170, 255, 0.22) 15%,
+    rgba(140, 190, 255, 0.12) 35%,
+    rgba(110, 210, 240, 0.05) 60%,
+    rgba(100, 220, 210, 0.01) 80%,
+    transparent 100%
+  );
+  animation: aurora-left 4s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.uc-window::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    to left,
+    rgba(255, 180, 140, 0.35) 0%,
+    rgba(255, 165, 165, 0.22) 15%,
+    rgba(245, 150, 190, 0.12) 35%,
+    rgba(220, 145, 210, 0.05) 60%,
+    rgba(190, 150, 230, 0.01) 80%,
+    transparent 100%
+  );
+  animation: aurora-right 4s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes aurora-left {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes aurora-right {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}

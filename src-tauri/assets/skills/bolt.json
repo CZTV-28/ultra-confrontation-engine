@@ -1,0 +1,9 @@
+{
+  "id": "bolt",
+  "name": "能量弹",
+  "type": "ranged",
+  "mp_cost": 25,
+  "damage": 50,
+  "hit_rate": 0.6,
+  "knockback": 30
+}
