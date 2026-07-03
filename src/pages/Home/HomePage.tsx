@@ -134,12 +134,23 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             <div className="home-light home-light-right" />
           </div>
 
-          <div className="home-title-block">
-            <div className="home-title">
-              ULTRA<span>♥</span>
-            </div>
-            <div className="home-title-sub">CONFRONTATION</div>
-            <div className="home-title-small">AI BATTLE SIMULATOR</div>
+          <div className={`home-title-block ${isEnglish ? "home-title-block-en" : "home-title-block-zh"}`}>
+            {isEnglish ? (
+              <>
+                <div className="home-title">
+                  ULTRA<span>♥</span>
+                </div>
+                <div className="home-title-sub">CONFRONTATION</div>
+              </>
+            ) : (
+              <div className="home-title-zh" aria-label="超类史诗">
+                {"超类史诗".split("").map((char, index) => (
+                  <span key={char} style={{ animationDelay: `${index * 0.12}s` }}>
+                    {char}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </main>
 

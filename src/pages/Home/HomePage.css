@@ -349,7 +349,7 @@
 
 .home-title-block {
   position: absolute;
-  top: 28px;
+  top: 34px;
   left: 0;
   right: 0;
   z-index: 2;
@@ -357,6 +357,20 @@
   flex-direction: column;
   align-items: center;
   pointer-events: none;
+  animation: home-logo-rise 0.72s ease-out both;
+}
+
+@keyframes home-logo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 
 .home-title {
@@ -370,7 +384,9 @@
     5px 5px 0 #777777,
     0 0 12px rgba(255, 255, 255, 0.42),
     0 0 28px rgba(178, 120, 255, 0.22);
-  animation: home-title-glow 2.8s ease-in-out infinite;
+  animation:
+    home-title-glow 2.8s ease-in-out infinite,
+    home-logo-hover 4.8s ease-in-out infinite;
 }
 
 .home-title span {
@@ -402,13 +418,78 @@
   text-shadow:
     4px 4px 0 #303030,
     0 0 12px rgba(255, 255, 255, 0.25);
+  animation: home-subtitle-glitch 4.2s steps(1, end) infinite;
 }
 
-.home-title-small {
-  margin-top: 13px;
-  color: #cfcfcf;
-  font-size: clamp(15px, 1.5vw, 21px);
-  letter-spacing: 4px;
+.home-title-zh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 1.6vw, 24px);
+  color: #ffffff;
+  font-family: "Microsoft YaHei", "SimHei", "Arial Black", sans-serif;
+  font-size: clamp(58px, 8.2vw, 120px);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    5px 5px 0 #4b4b4b,
+    0 0 14px rgba(255, 255, 255, 0.58),
+    0 0 34px rgba(184, 92, 255, 0.42);
+}
+
+.home-title-zh span {
+  display: inline-block;
+  animation:
+    home-zh-char-rise 0.76s cubic-bezier(0.16, 1, 0.3, 1) both,
+    home-zh-char-glow 3.2s ease-in-out infinite;
+}
+
+@keyframes home-logo-hover {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes home-subtitle-glitch {
+  0%,
+  88%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  90% {
+    opacity: 0.72;
+    transform: translate(2px, 0);
+  }
+  92% {
+    opacity: 1;
+    transform: translate(-2px, 1px);
+  }
+}
+
+@keyframes home-zh-char-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes home-zh-char-glow {
+  0%,
+  100% {
+    filter: brightness(0.95);
+  }
+  50% {
+    filter: brightness(1.24);
+  }
 }
 
 .home-footer {
