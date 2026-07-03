@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import { useSettingsStore } from "../../store/settingsStore";
 import "./BattlePage.css";
@@ -38,29 +39,109 @@ interface BattleResult {
 }
 
 type BattlePhase = "select" | "showcase" | "battle";
+type Language = "zh" | "en";
 
 const ARENA_RADIUS = 250;
 const MAX_HP = 500;
 const MAX_MP = 250;
 
-const actionMap: Record<string, string> = {
-  Wait: "等待",
-  MoveToward: "前进",
-  MoveAway: "后退",
-  BasicAttack: "普攻",
-  MeleeSkill: "近战技能",
-  RangedSkill: "远程技能",
-  Block: "格挡",
-  Dodge: "闪避",
+const actionMap: Record<Language, Record<string, string>> = {
+  zh: {
+    Wait: "等待",
+    MoveToward: "前进",
+    MoveAway: "后退",
+    BasicAttack: "普攻",
+    MeleeSkill: "近战技能",
+    RangedSkill: "远程技能",
+    Block: "格挡",
+    Dodge: "闪避",
+  },
+  en: {
+    Wait: "Wait",
+    MoveToward: "Move Toward",
+    MoveAway: "Move Away",
+    BasicAttack: "Basic Attack",
+    MeleeSkill: "Melee Skill",
+    RangedSkill: "Ranged Skill",
+    Block: "Block",
+    Dodge: "Dodge",
+  },
 };
 
-function translateAction(action: string): string {
-  return actionMap[action] ?? action;
+const battleCopy = {
+  zh: {
+    back: "返回",
+    title: "模拟对战",
+    phaseSelect: "选择人物",
+    phaseShowcase: "人物展示",
+    phaseBattle: "模拟对战",
+    createSimulation: "创建模拟",
+    leftCharacter: "左侧角色",
+    rightCharacter: "右侧角色",
+    map: "地图",
+    confirmTeam: "确认阵容",
+    dataLoaded: "战斗数据已载入",
+    showcaseText:
+      "双方角色将在 Circle500 圆形场地内同时行动。移动、攻击、格挡、闪避与技能判定由 UCE 后端战斗引擎逐回合执行。",
+    startSimulation: "开始模拟",
+    running: "模拟运行中...",
+    winner: "胜者",
+    tauriError: "无法连接 Tauri 后端，请在桌面应用中运行模拟。",
+    finishWriteError: "模拟已结束，但结果写入失败。",
+    waitingEngine: "等待战斗引擎返回下一回合...",
+    replaySaved: "模拟结束，回放已写入本地记录。",
+    logTitle: "战斗日志",
+    waitingStart: "等待模拟开始。",
+    roundTurn: (round: number, turn: number) => `第${round}轮 第${turn}回合`,
+    simulationFinished: "模拟结束",
+    turnsUsed: "使用回合",
+    reason: "原因",
+    confirmNext: "确认 / 下一步",
+    backHome: "返回主页",
+    restart: "重新选择",
+    draw: "平局",
+  },
+  en: {
+    back: "Back",
+    title: "Simulation",
+    phaseSelect: "Character Select",
+    phaseShowcase: "Character Showcase",
+    phaseBattle: "Battle Simulation",
+    createSimulation: "Create Simulation",
+    leftCharacter: "Left Character",
+    rightCharacter: "Right Character",
+    map: "Map",
+    confirmTeam: "Confirm Team",
+    dataLoaded: "Battle Data Loaded",
+    showcaseText:
+      "Both characters act simultaneously inside the Circle500 arena. Movement, attacks, blocks, dodges, and skills are resolved turn by turn by the UCE battle engine.",
+    startSimulation: "Start Simulation",
+    running: "Simulation running...",
+    winner: "Winner",
+    tauriError: "Cannot connect to the Tauri backend. Run the simulation in the desktop app.",
+    finishWriteError: "Simulation ended, but the result could not be written.",
+    waitingEngine: "Waiting for the battle engine to return the next turn...",
+    replaySaved: "Simulation ended. Replay saved to local records.",
+    logTitle: "Battle Log",
+    waitingStart: "Waiting for simulation to start.",
+    roundTurn: (round: number, turn: number) => `Round ${round} / Turn ${turn}`,
+    simulationFinished: "Simulation Finished",
+    turnsUsed: "Turns Used",
+    reason: "Reason",
+    confirmNext: "Confirm / Next",
+    backHome: "Back Home",
+    restart: "Restart",
+    draw: "Draw",
+  },
+};
+
+function translateAction(action: string, lang: Language): string {
+  return actionMap[lang][action] ?? action;
 }
 
-function translateReason(reason: string): string {
+function translateReason(reason: string, lang: Language): string {
   if (reason === "draw") {
-    return "平局";
+    return battleCopy[lang].draw;
   }
   return reason;
 }
@@ -130,7 +211,10 @@ function BattleFighter({ armed = false }: { armed?: boolean }) {
 }
 
 export default function BattlePage({ goBack }: BattlePageProps) {
+  const { i18n } = useTranslation();
   const { battleSpeed } = useSettingsStore();
+  const lang: Language = i18n.language.startsWith("en") ? "en" : "zh";
+  const copy = battleCopy[lang];
   const [phase, setPhase] = useState<BattlePhase>("select");
   const [turns, setTurns] = useState<TurnRecord[]>([]);
   const [result, setResult] = useState<BattleResult | null>(null);
@@ -148,6 +232,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const mpB = lastTurn?.mp_b ?? MAX_MP;
   const posA = lastTurn ? toArenaPoint(lastTurn.pos_a_x, lastTurn.pos_a_y) : toArenaPoint(-100, 0);
   const posB = lastTurn ? toArenaPoint(lastTurn.pos_b_x, lastTurn.pos_b_y) : toArenaPoint(100, 0);
+  const battleDelay = battleSpeed <= 0 ? 0 : Math.round(1000 / battleSpeed);
 
   const stopBattle = () => {
     if (timerRef.current) {
@@ -176,6 +261,28 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     try {
       const id = await invoke<string>("init_battle");
 
+      if (battleSpeed <= 0) {
+        const completedTurns: TurnRecord[] = [];
+
+        for (;;) {
+          try {
+            const record = await invoke<TurnRecord>("step_battle", { sessionId: id });
+            completedTurns.push(record);
+          } catch {
+            try {
+              const finalResult = await invoke<BattleResult>("finish_battle", { sessionId: id });
+              setTurns(finalResult.turns.length > 0 ? finalResult.turns : completedTurns);
+              setResult(finalResult);
+            } catch {
+              setTurns(completedTurns);
+              setErrorMessage(copy.finishWriteError);
+            }
+            setRunning(false);
+            return;
+          }
+        }
+      }
+
       const step = async () => {
         try {
           const record = await invoke<TurnRecord>("step_battle", { sessionId: id });
@@ -184,22 +291,23 @@ export default function BattlePage({ goBack }: BattlePageProps) {
             setShake(true);
             setFlash(true);
           }
-          timerRef.current = window.setTimeout(step, battleSpeed);
+          timerRef.current = window.setTimeout(step, battleDelay);
         } catch {
           try {
             const finalResult = await invoke<BattleResult>("finish_battle", { sessionId: id });
+            setTurns(finalResult.turns);
             setResult(finalResult);
           } catch {
-            setErrorMessage("模拟已结束，但结果写入失败。");
+            setErrorMessage(copy.finishWriteError);
           }
           setRunning(false);
         }
       };
 
-      timerRef.current = window.setTimeout(step, battleSpeed);
+      timerRef.current = window.setTimeout(step, battleDelay);
     } catch {
       setRunning(false);
-      setErrorMessage("无法连接 Tauri 后端，请在桌面应用中运行模拟。");
+      setErrorMessage(copy.tauriError);
     }
   };
 
@@ -249,7 +357,8 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     }
   }, [flash]);
 
-  const phaseTitle = phase === "select" ? "选择人物" : phase === "showcase" ? "人物展示" : "模拟对战";
+  const phaseTitle =
+    phase === "select" ? copy.phaseSelect : phase === "showcase" ? copy.phaseShowcase : copy.phaseBattle;
 
   return (
     <UCWindow>
@@ -257,9 +366,9 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         {flash && <div className="battle-damage-flash" />}
 
         <header className="battle-header">
-          <button className="battle-back-button" type="button" onClick={goBack}>× 返回</button>
+          <button className="battle-back-button" type="button" onClick={goBack}>× {copy.back}</button>
           <div>
-            <h1>模拟对战</h1>
+            <h1>{copy.title}</h1>
             <span>{phaseTitle}</span>
           </div>
           <div className="battle-version">UCE v0.1.0</div>
@@ -269,11 +378,11 @@ export default function BattlePage({ goBack }: BattlePageProps) {
           <section className={`battle-panel battle-flow-panel battle-flow-panel-${phase}`}>
             {phase === "select" && (
               <div className="battle-selection">
-                <div className="battle-section-title">创建模拟</div>
+                <div className="battle-section-title">{copy.createSimulation}</div>
                 <div className="battle-rule" />
                 <div className="battle-versus-select">
                   <div className="battle-picker">
-                    <h2>左侧角色</h2>
+                    <h2>{copy.leftCharacter}</h2>
                     <div className="battle-fighter-frame">
                       <span>‹</span>
                       <BattleFighter />
@@ -283,7 +392,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   </div>
                   <div className="battle-vs">VS</div>
                   <div className="battle-picker">
-                    <h2>右侧角色</h2>
+                    <h2>{copy.rightCharacter}</h2>
                     <div className="battle-fighter-frame">
                       <span>‹</span>
                       <BattleFighter />
@@ -293,12 +402,12 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   </div>
                 </div>
                 <div className="battle-map-select">
-                  <span>地图</span>
+                  <span>{copy.map}</span>
                   <button type="button"><span /> Circle500 ▾</button>
                 </div>
                 <button className="battle-primary-button" type="button" onClick={() => setPhase("showcase")}>
                   <span>♥</span>
-                  确认阵容
+                  {copy.confirmTeam}
                 </button>
               </div>
             )}
@@ -311,22 +420,22 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   <div className="battle-showcase-fighter battle-showcase-left">
                     <BattleFighter armed />
                     <strong>DummyA</strong>
-                    <span>近战压制 / 格挡反击</span>
+                    <span>{lang === "en" ? "Melee pressure / Counter block" : "近战压制 / 格挡反击"}</span>
                   </div>
                   <div className="battle-showcase-vs">VS</div>
                   <div className="battle-showcase-fighter battle-showcase-right">
                     <BattleFighter />
                     <strong>DummyB</strong>
-                    <span>远程牵制 / 闪避机动</span>
+                    <span>{lang === "en" ? "Ranged control / Dodge mobility" : "远程牵制 / 闪避机动"}</span>
                   </div>
                 </div>
                 <div className="battle-showcase-text">
-                  <h2>战斗数据已载入</h2>
-                  <p>双方角色将在 Circle500 圆形场地内同时行动。移动、攻击、格挡、闪避与技能判定由 UCE 后端战斗引擎逐回合执行。</p>
+                  <h2>{copy.dataLoaded}</h2>
+                  <p>{copy.showcaseText}</p>
                 </div>
                 <button className="battle-primary-button" type="button" onClick={startBattle}>
                   <span>♥</span>
-                  开始模拟
+                  {copy.startSimulation}
                 </button>
               </div>
             )}
@@ -346,44 +455,13 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   <BattleFighter armed={Boolean(lastTurn?.damage_to_a)} />
                 </div>
                 <div className="battle-live-state">
-                  {running && "模拟运行中..."}
-                  {!running && result && `胜者：${result.winner}`}
+                  {running && copy.running}
+                  {!running && result && `${copy.winner}: ${result.winner}`}
                   {!running && !result && errorMessage}
                 </div>
               </div>
             )}
           </section>
-
-          <aside className="battle-panel battle-status-panel">
-            <div className="battle-section-title">流程状态</div>
-            <div className="battle-rule" />
-            <div className="battle-steps">
-              <span className={phase === "select" ? "battle-step-active" : ""}>1 选择人物</span>
-              <span className={phase === "showcase" ? "battle-step-active" : ""}>2 人物展示</span>
-              <span className={phase === "battle" ? "battle-step-active" : ""}>3 模拟对战</span>
-            </div>
-            <div className="battle-data-card">
-              <span>左侧角色</span>
-              <strong>DummyA</strong>
-            </div>
-            <div className="battle-data-card">
-              <span>右侧角色</span>
-              <strong>DummyB</strong>
-            </div>
-            <div className="battle-data-card">
-              <span>地图</span>
-              <strong>Circle500</strong>
-            </div>
-            {result && (
-              <div className="battle-result-card">
-                <strong>模拟结果</strong>
-                <span>胜者：{result.winner}</span>
-                <span>轮数：{result.rounds_played}</span>
-                <span>回合：{result.turns_played}</span>
-                <span>原因：{translateReason(result.loss_reason)}</span>
-              </div>
-            )}
-          </aside>
 
           {phase === "battle" && (
             <>
@@ -441,37 +519,30 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   </div>
                 </div>
 
-                <div className="battle-actions-row">
-                  <button type="button" className="battle-action-active">╱ 攻击</button>
-                  <button type="button">✦ 技能</button>
-                  <button type="button">▱ 格挡</button>
-                  <button type="button">↯ 闪避</button>
-                </div>
-
                 <div className="battle-command-line">
-                  {running && "等待战斗引擎返回下一回合..."}
-                  {!running && result && "模拟结束，回放已写入本地记录。"}
+                  {running && copy.waitingEngine}
+                  {!running && result && copy.replaySaved}
                   {!running && !result && errorMessage}
                 </div>
               </section>
 
               <section className="battle-panel battle-log-panel" ref={logRef}>
-                <div className="battle-section-title">战斗日志</div>
+                <div className="battle-section-title">{copy.logTitle}</div>
                 <div className="battle-rule" />
                 <div className="battle-log-list">
                   {turns.length === 0 && (
                     <div className="battle-empty-log">
                       <BattleSkull />
-                      <span>等待模拟开始。</span>
+                      <span>{copy.waitingStart}</span>
                     </div>
                   )}
-                  {turns.slice(-24).map((turn) => (
+                  {turns.map((turn) => (
                     <div key={`${turn.round}-${turn.turn}`} className="battle-log-entry">
                       <BattleSkull />
                       <div>
-                        <strong>第{turn.round}轮 第{turn.turn}回合</strong>
-                        <p>DummyA：{translateAction(turn.action_a)}</p>
-                        <p>DummyB：{translateAction(turn.action_b)}</p>
+                        <strong>{copy.roundTurn(turn.round, turn.turn)}</strong>
+                        <p>DummyA: {translateAction(turn.action_a, lang)}</p>
+                        <p>DummyB: {translateAction(turn.action_b, lang)}</p>
                         {(turn.damage_to_a > 0 || turn.damage_to_b > 0) && (
                           <p className="battle-log-damage">
                             {turn.damage_to_a > 0 && `A -${turn.damage_to_a} `}
@@ -485,9 +556,10 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                     <div className="battle-log-entry battle-log-result">
                       <BattleSkull />
                       <div>
-                        <strong>模拟结束</strong>
-                        <p>胜者：{result.winner}</p>
-                        <p>原因：{translateReason(result.loss_reason)}</p>
+                        <strong>{copy.simulationFinished}</strong>
+                        <p>{copy.turnsUsed}: {result.turns_played}</p>
+                        <p>{copy.winner}: {result.winner}</p>
+                        <p>{copy.reason}: {translateReason(result.loss_reason, lang)}</p>
                       </div>
                     </div>
                   )}
@@ -498,9 +570,9 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         </main>
 
         <footer className="battle-footer">
-          <span><b>♥</b> 确认 / 下一步</span>
-          <span><b>×</b> 返回主页</span>
-          {phase === "battle" && result && <button type="button" onClick={resetBattle}>重新选择</button>}
+          <span><b>♥</b> {copy.confirmNext}</span>
+          <span><b>×</b> {copy.backHome}</span>
+          {phase === "battle" && result && <button type="button" onClick={resetBattle}>{copy.restart}</button>}
         </footer>
       </div>
     </UCWindow>

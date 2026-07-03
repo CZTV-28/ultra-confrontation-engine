@@ -13,6 +13,8 @@ interface SettingsPageProps {
 export default function SettingsPage({ goBack }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
   const { battleSpeed, volume, setBattleSpeed, setVolume } = useSettingsStore();
+  const lang = i18n.language.startsWith("en") ? "en" : "zh";
+  const isEnglish = lang === "en";
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,18 +29,17 @@ export default function SettingsPage({ goBack }: SettingsPageProps) {
   }, [goBack]);
 
   const toggleLanguage = () => {
-    const nextLang = i18n.language === "zh" ? "en" : "zh";
+    const nextLang = isEnglish ? "zh" : "en";
     i18n.changeLanguage(nextLang);
+    window.localStorage.setItem("uce_language", nextLang);
   };
 
-  const lang = i18n.language;
-
-  const speedOptions = [
-    { label: lang === "zh" ? "0.5秒" : "0.5s", value: 500 },
-    { label: lang === "zh" ? "1秒" : "1s", value: 1000 },
-    { label: lang === "zh" ? "2秒" : "2s", value: 2000 },
-    { label: lang === "zh" ? "3秒" : "3s", value: 3000 },
-  ];
+  const speedLabel =
+    battleSpeed === 0
+      ? isEnglish
+        ? "Instant"
+        : "立即完成"
+      : `${battleSpeed.toFixed(2).replace(/\.00$/, "").replace(/0$/, "")}x`;
 
   return (
     <UCWindow>
@@ -47,34 +48,38 @@ export default function SettingsPage({ goBack }: SettingsPageProps) {
 
         <div className="settings-section">
           <div className="settings-label">
-            {lang === "zh" ? "语言 / Language" : "Language"}
+            {isEnglish ? "Language" : "语言 / Language"}
           </div>
           <UCButton
-            text={i18n.language === "zh" ? "中文 → English" : "English → 中文"}
+            text={isEnglish ? "English → 中文" : "中文 → English"}
             onClick={toggleLanguage}
           />
         </div>
 
         <div className="settings-section">
           <div className="settings-label">
-            {lang === "zh" ? "模拟速度" : "Battle Speed"}
+            {isEnglish ? "Simulation Speed" : "模拟倍速"}: {speedLabel}
           </div>
-          <div className="settings-options">
-            {speedOptions.map((opt) => (
-              <button
-                key={opt.value}
-                className={`settings-option-btn ${battleSpeed === opt.value ? "settings-option-active" : ""}`}
-                onClick={() => setBattleSpeed(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <input
+            type="range"
+            min="0"
+            max="3"
+            step="0.25"
+            value={battleSpeed}
+            onChange={(e) => setBattleSpeed(Number(e.target.value))}
+            className="settings-slider"
+          />
+          <div className="settings-slider-scale">
+            <span>0</span>
+            <span>1x</span>
+            <span>2x</span>
+            <span>3x</span>
           </div>
         </div>
 
         <div className="settings-section">
           <div className="settings-label">
-            {lang === "zh" ? "音量" : "Volume"}: {volume}%
+            {isEnglish ? "Volume" : "音量"}: {volume}%
           </div>
           <input
             type="range"
@@ -88,17 +93,17 @@ export default function SettingsPage({ goBack }: SettingsPageProps) {
 
         <div className="settings-guide">
           <div className="settings-guide-title">
-            {lang === "zh" ? "按键指南" : "Key Guide"}
+            {isEnglish ? "Key Guide" : "按键指南"}
           </div>
           <div className="settings-guide-grid">
-            <span><span className="guide-key">↑↓/WS</span> {lang === "zh" ? "选择" : "Select"}</span>
-            <span><span className="guide-key">←→/AD</span> {lang === "zh" ? "调整" : "Adjust"}</span>
-            <span><span className="guide-key">Z/Enter</span> {lang === "zh" ? "确认" : "Confirm"}</span>
-            <span><span className="guide-key">X</span> {lang === "zh" ? "返回" : "Back"}</span>
-            <span><span className="guide-key">E</span> {lang === "zh" ? "导出" : "Export"}</span>
-            <span><span className="guide-key">I</span> {lang === "zh" ? "导入" : "Import"}</span>
-            <span><span className="guide-key">D</span> {lang === "zh" ? "删除" : "Delete"}</span>
-            <span><span className="guide-key">Space</span> {lang === "zh" ? "播放/暂停" : "Play/Pause"}</span>
+            <span><span className="guide-key">↑↓/WS</span> {isEnglish ? "Select" : "选择"}</span>
+            <span><span className="guide-key">←→/AD</span> {isEnglish ? "Adjust" : "调整"}</span>
+            <span><span className="guide-key">Z/Enter</span> {isEnglish ? "Confirm" : "确认"}</span>
+            <span><span className="guide-key">X</span> {isEnglish ? "Back" : "返回"}</span>
+            <span><span className="guide-key">E</span> {isEnglish ? "Export" : "导出"}</span>
+            <span><span className="guide-key">I</span> {isEnglish ? "Import" : "导入"}</span>
+            <span><span className="guide-key">D</span> {isEnglish ? "Delete" : "删除"}</span>
+            <span><span className="guide-key">Space</span> {isEnglish ? "Play/Pause" : "播放/暂停"}</span>
           </div>
         </div>
       </UCPanel>

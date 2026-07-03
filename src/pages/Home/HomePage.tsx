@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import "./HomePage.css";
 
@@ -15,15 +16,6 @@ interface SidebarItem {
   icon: string;
   page?: Page;
 }
-
-const sidebarItems: SidebarItem[] = [
-  { id: "home", label: "主页", icon: "⌂", page: "home" },
-  { id: "battle", label: "模拟", icon: "✚", page: "battle" },
-  { id: "trainer", label: "AI训练", icon: "✣", page: "trainer" },
-  { id: "replay", label: "Replay", icon: "▶", page: "replay" },
-  { id: "resources", label: "资源编辑器", icon: "□" },
-  { id: "settings", label: "设置", icon: "⚙", page: "settings" },
-];
 
 function HomeSkull() {
   return (
@@ -44,7 +36,20 @@ function HomeSkull() {
 }
 
 export default function HomePage({ navigateTo }: HomePageProps) {
+  const { i18n } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const isEnglish = i18n.language.startsWith("en");
+
+  const sidebarItems: SidebarItem[] = useMemo(
+    () => [
+      { id: "home", label: isEnglish ? "Home" : "主页", icon: "⌂", page: "home" },
+      { id: "battle", label: isEnglish ? "Simulation" : "模拟", icon: "✚", page: "battle" },
+      { id: "trainer", label: isEnglish ? "AI Training" : "AI训练", icon: "✣", page: "trainer" },
+      { id: "replay", label: "Replay", icon: "▶", page: "replay" },
+      { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "⚙", page: "settings" },
+    ],
+    [isEnglish],
+  );
 
   const stars = useMemo(
     () =>
@@ -139,8 +144,8 @@ export default function HomePage({ navigateTo }: HomePageProps) {
         </main>
 
         <footer className="home-footer">
-          <span><span className="home-footer-heart">♥</span> 确认</span>
-          <span><span className="home-footer-x">×</span> 返回</span>
+          <span><span className="home-footer-heart">♥</span> {isEnglish ? "Confirm" : "确认"}</span>
+          <span><span className="home-footer-x">×</span> {isEnglish ? "Back" : "返回"}</span>
         </footer>
       </div>
     </UCWindow>

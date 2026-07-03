@@ -59,6 +59,14 @@
   cursor: none;
 }
 
+.settings-slider-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: #777;
+  font-size: 14px;
+}
+
 .settings-guide {
   margin-top: 40px;
   padding-top: 24px;

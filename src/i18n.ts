@@ -28,10 +28,14 @@ const resources = {
   },
 };
 
+const savedLanguage =
+  typeof window !== "undefined" ? window.localStorage.getItem("uce_language") : null;
+
 i18n.use(initReactI18next).init({
   resources,
-  lng: "zh",
+  lng: savedLanguage || "zh",
   fallbackLng: "zh",
+  supportedLngs: ["zh", "en"],
   interpolation: {
     escapeValue: false,
   },

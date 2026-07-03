@@ -8,8 +8,9 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  battleSpeed: 1000,
+  battleSpeed: 1,
   volume: 80,
-  setBattleSpeed: (speed) => set({ battleSpeed: speed }),
-  setVolume: (volume) => set({ volume }),
+  setBattleSpeed: (speed) =>
+    set({ battleSpeed: Math.max(0, Math.min(3, Math.round(speed * 4) / 4)) }),
+  setVolume: (volume) => set({ volume: Math.max(0, Math.min(100, volume)) }),
 }));

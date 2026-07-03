@@ -379,7 +379,7 @@ impl BattleEngine {
             position_b_after: self.fighter_b.position.clone(),
         };
 
-        if self.turn >= self.max_turns {
+        if self.max_turns > 0 && self.turn >= self.max_turns {
             self.round += 1;
             self.turn = 1;
         } else {
@@ -875,5 +875,18 @@ mod tests {
         assert_eq!(fourth.turn, 2);
         assert!(engine.is_finished());
         assert_eq!(engine.get_winner(), Some("draw".to_string()));
+    }
+
+    #[test]
+    fn zero_max_turns_disables_turn_limit() {
+        let mut engine = engine(2, 0);
+        let mut rng = StdRng::seed_from_u64(1);
+
+        for expected_turn in 1..=40 {
+            let result = engine.execute_turn(Action::Wait, Action::Wait, &mut rng);
+            assert_eq!(result.round, 1);
+            assert_eq!(result.turn, expected_turn);
+            assert!(!engine.is_finished());
+        }
     }
 }

@@ -3,7 +3,7 @@
   "name": "起源",
   "match": {
     "max_rounds": 30,
-    "max_turns_per_round": 30
+    "max_turns_per_round": 0
   },
   "arena": {
     "type": "circle",
