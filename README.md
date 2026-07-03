@@ -36,6 +36,18 @@ Ultra Confrontation Engine 是基于此工程诞生的引擎（下文简称 UCE�
 npm install
 ```
 
+同步游戏数据：
+
+```powershell
+npm run sync:assets
+```
+
+检查游戏数据是否同步：
+
+```powershell
+npm run check:assets
+```
+
 运行 Web 前端：
 
 ```powershell

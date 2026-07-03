@@ -36,6 +36,18 @@ Install dependencies:
 npm install
 ```
 
+Synchronize game data:
+
+```powershell
+npm run sync:assets
+```
+
+Check whether game data is synchronized:
+
+```powershell
+npm run check:assets
+```
+
 Run the web frontend:
 
 ```powershell

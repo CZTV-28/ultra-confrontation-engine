@@ -3,5 +3,6 @@
   "name": "基础格挡",
   "type": "block",
   "mp_cost": 0,
-  "damage_reduction": 0.5
+  "damage_reduction": 0.5,
+  "max_damage_reduction": 0.75
 }

@@ -36,6 +36,18 @@ Ultra Confrontation Engine は、このプロジェクトから生まれたエ�
 npm install
 ```
 
+ゲームデータを同期：
+
+```powershell
+npm run sync:assets
+```
+
+ゲームデータが同期されているか確認：
+
+```powershell
+npm run check:assets
+```
+
 Web フロントエンドを実行：
 
 ```powershell
