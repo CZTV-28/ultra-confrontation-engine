@@ -46,15 +46,26 @@ interface CharacterSkills {
   passive: string | null;
 }
 
+interface CharacterPortrait {
+  file_name: string;
+  mime_type: string;
+  data_url: string;
+}
+
 interface CharacterResource {
   id: string;
   name: string;
   creator: string;
   description?: string | null;
+  portrait?: CharacterPortrait | null;
   hp: number;
   mp: number;
   skills: CharacterSkills;
   passive?: PassiveResource | null;
+}
+
+interface ArenaThumbnail {
+  data_url: string;
 }
 
 interface ArenaResource {
@@ -62,6 +73,7 @@ interface ArenaResource {
   name: string;
   shape: string;
   radius: number;
+  thumbnail?: ArenaThumbnail | null;
   spawn_points: Array<{ x: number; y: number }>;
 }
 
@@ -114,6 +126,8 @@ type SetupFocus = "left" | "right" | "arena" | "ruleset" | "confirm";
 const ARENA_RADIUS = 250;
 const MAX_HP = 500;
 const MAX_MP = 250;
+const CHARACTER_LIBRARY_SLOTS = 12;
+const ARENA_LIBRARY_SLOTS = 8;
 
 const actionMap: Record<Language, Record<string, string>> = {
   zh: {
@@ -174,6 +188,9 @@ const battleCopy = {
     reduction: "减伤",
     retreat: "后撤",
     selected: "已选择",
+    emptySlot: "空白席位",
+    futureCharacter: "后续角色",
+    futureArena: "后续地图",
     confirmPick: "确认选择",
     selectLeft: "选择左侧角色",
     selectRight: "选择右侧角色",
@@ -234,6 +251,9 @@ const battleCopy = {
     reduction: "Reduction",
     retreat: "Retreat",
     selected: "Selected",
+    emptySlot: "Empty Slot",
+    futureCharacter: "Future Character",
+    futureArena: "Future Stage",
     confirmPick: "Confirm",
     selectLeft: "Select Left Character",
     selectRight: "Select Right Character",
@@ -373,6 +393,36 @@ function BattleFighter({ armed = false }: { armed?: boolean }) {
   );
 }
 
+function CharacterPortraitView({
+  character,
+  armed = false,
+}: {
+  character?: CharacterResource;
+  armed?: boolean;
+}) {
+  const dataUrl = character?.portrait?.data_url;
+
+  return (
+    <div className={`battle-portrait-view ${dataUrl ? "battle-portrait-view-image" : ""}`}>
+      {dataUrl ? (
+        <img src={dataUrl} alt={character?.name ?? "character"} />
+      ) : (
+        <BattleFighter armed={armed} />
+      )}
+    </div>
+  );
+}
+
+function ArenaPreview({ arena, compact = false }: { arena?: ArenaResource; compact?: boolean }) {
+  const dataUrl = arena?.thumbnail?.data_url;
+
+  return (
+    <span className={`battle-arena-preview ${compact ? "battle-arena-preview-compact" : ""}`}>
+      {dataUrl ? <img src={dataUrl} alt={arena?.name ?? "arena"} /> : <span className="battle-arena-generated" />}
+    </span>
+  );
+}
+
 export default function BattlePage({ goBack }: BattlePageProps) {
   const { i18n } = useTranslation();
   const { battleSpeed } = useSettingsStore();
@@ -409,6 +459,22 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const selectedRuleset = rulesets.find((ruleset) => ruleset.season === selectedRulesetId);
   const focusedCharacter = characters[focusedCharacterIndex];
   const focusedArena = arenas[focusedArenaIndex];
+  const characterSlots = useMemo(
+    () =>
+      Array.from({ length: Math.max(CHARACTER_LIBRARY_SLOTS, characters.length) }, (_, index) => ({
+        character: characters[index],
+        slot: index + 1,
+      })),
+    [characters],
+  );
+  const arenaSlots = useMemo(
+    () =>
+      Array.from({ length: Math.max(ARENA_LIBRARY_SLOTS, arenas.length) }, (_, index) => ({
+        arena: arenas[index],
+        slot: index + 1,
+      })),
+    [arenas],
+  );
   const maxHp = selectedRuleset?.character_defaults.max_hp ?? MAX_HP;
   const maxMp = selectedRuleset?.character_defaults.max_mp ?? MAX_MP;
   const arenaRadius = selectedArena?.radius ?? ARENA_RADIUS;
@@ -846,7 +912,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   >
                     <h2>{copy.leftCharacter}</h2>
                     <div className="battle-fighter-frame">
-                      <BattleFighter />
+                      <CharacterPortraitView character={selectedLeft} />
                     </div>
                     <strong>{selectedLeft?.name ?? copy.noResource}</strong>
                     <span>{selectedLeft ? `${copy.creator}: ${selectedLeft.creator}` : copy.noResource}</span>
@@ -863,7 +929,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   >
                     <h2>{copy.rightCharacter}</h2>
                     <div className="battle-fighter-frame">
-                      <BattleFighter />
+                      <CharacterPortraitView character={selectedRight} />
                     </div>
                     <strong>{selectedRight?.name ?? copy.noResource}</strong>
                     <span>{selectedRight ? `${copy.creator}: ${selectedRight.creator}` : copy.noResource}</span>
@@ -878,7 +944,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                     onMouseEnter={() => setSetupFocus("arena")}
                     disabled={assetsLoading || arenas.length === 0}
                   >
-                    <span className="battle-map-thumb" />
+                    <ArenaPreview arena={selectedArena} compact />
                     <b>{copy.map}</b>
                     <strong>{selectedArena?.name ?? copy.noResource}</strong>
                   </button>
@@ -911,23 +977,33 @@ export default function BattlePage({ goBack }: BattlePageProps) {
             {phase === "characterPicker" && (
               <div className="battle-character-library">
                 <div className="battle-library-grid">
-                  {characters.map((character, index) => (
-                    <button
-                      key={character.id}
-                      className={`battle-character-card ${index === focusedCharacterIndex ? "battle-library-focused" : ""} ${
-                        character.id === selectedLeftId || character.id === selectedRightId ? "battle-library-selected" : ""
-                      }`}
-                      type="button"
-                      onMouseEnter={() => setFocusedCharacterIndex(index)}
-                      onClick={() => setFocusedCharacterIndex(index)}
-                    >
-                      <div className="battle-character-portrait">
-                        <BattleFighter armed={index === focusedCharacterIndex} />
+                  {characterSlots.map(({ character, slot }, index) =>
+                    character ? (
+                      <button
+                        key={character.id}
+                        className={`battle-character-card ${index === focusedCharacterIndex ? "battle-library-focused" : ""} ${
+                          character.id === selectedLeftId || character.id === selectedRightId ? "battle-library-selected" : ""
+                        }`}
+                        type="button"
+                        onMouseEnter={() => setFocusedCharacterIndex(index)}
+                        onClick={() => setFocusedCharacterIndex(index)}
+                      >
+                        <div className="battle-character-portrait">
+                          <CharacterPortraitView character={character} armed={index === focusedCharacterIndex} />
+                        </div>
+                        <strong>{character.name}</strong>
+                        <span>{character.id === selectedLeftId || character.id === selectedRightId ? copy.selected : character.creator}</span>
+                      </button>
+                    ) : (
+                      <div className="battle-character-card battle-character-card-empty" key={`character-empty-${slot}`}>
+                        <div className="battle-character-portrait">
+                          <span>{String(slot).padStart(2, "0")}</span>
+                        </div>
+                        <strong>{copy.emptySlot}</strong>
+                        <span>{copy.futureCharacter}</span>
                       </div>
-                      <strong>{character.name}</strong>
-                      <span>{character.id === selectedLeftId || character.id === selectedRightId ? copy.selected : character.creator}</span>
-                    </button>
-                  ))}
+                    ),
+                  )}
                 </div>
 
                 <aside className="battle-library-detail">
@@ -938,7 +1014,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   {focusedCharacter ? (
                     <>
                       <div className="battle-detail-portrait">
-                        <BattleFighter armed />
+                        <CharacterPortraitView character={focusedCharacter} armed />
                       </div>
                       <h2>{focusedCharacter.name}</h2>
                       <div className="battle-detail-stats">
@@ -976,23 +1052,33 @@ export default function BattlePage({ goBack }: BattlePageProps) {
             {phase === "arenaPicker" && (
               <div className="battle-arena-library">
                 <div className="battle-arena-list">
-                  {arenas.map((arena, index) => (
-                    <button
-                      key={arena.id}
-                      className={`battle-arena-card ${index === focusedArenaIndex ? "battle-library-focused" : ""} ${
-                        arena.id === selectedArenaId ? "battle-library-selected" : ""
-                      }`}
-                      type="button"
-                      onMouseEnter={() => setFocusedArenaIndex(index)}
-                      onClick={() => setFocusedArenaIndex(index)}
-                    >
-                      <span className="battle-arena-thumb" />
-                      <span>
-                        <strong>{arena.name}</strong>
-                        <em>{arena.shape} / {copy.arenaRadius} {arena.radius}</em>
-                      </span>
-                    </button>
-                  ))}
+                  {arenaSlots.map(({ arena, slot }, index) =>
+                    arena ? (
+                      <button
+                        key={arena.id}
+                        className={`battle-arena-card ${index === focusedArenaIndex ? "battle-library-focused" : ""} ${
+                          arena.id === selectedArenaId ? "battle-library-selected" : ""
+                        }`}
+                        type="button"
+                        onMouseEnter={() => setFocusedArenaIndex(index)}
+                        onClick={() => setFocusedArenaIndex(index)}
+                      >
+                        <ArenaPreview arena={arena} />
+                        <span>
+                          <strong>{arena.name}</strong>
+                          <em>{arena.shape} / {copy.arenaRadius} {arena.radius}</em>
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="battle-arena-card battle-arena-card-empty" key={`arena-empty-${slot}`}>
+                        <ArenaPreview compact />
+                        <span>
+                          <strong>{copy.emptySlot}</strong>
+                          <em>{copy.futureArena}</em>
+                        </span>
+                      </div>
+                    ),
+                  )}
                 </div>
 
                 <aside className="battle-library-detail">
@@ -1001,7 +1087,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   {focusedArena ? (
                     <>
                       <div className="battle-detail-map">
-                        <span className="battle-arena-thumb" />
+                        <ArenaPreview arena={focusedArena} />
                       </div>
                       <h2>{focusedArena.name}</h2>
                       <div className="battle-detail-stats">
@@ -1027,13 +1113,13 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   <div className="battle-showcase-light" />
                   <div className="battle-showcase-ring" />
                   <div className="battle-showcase-fighter battle-showcase-left">
-                    <BattleFighter armed />
+                    <CharacterPortraitView character={selectedLeft} armed />
                     <strong>{selectedLeft?.name ?? copy.leftCharacter}</strong>
                     <span>{skillSummary(selectedLeft)}</span>
                   </div>
                   <div className="battle-showcase-vs">VS</div>
                   <div className="battle-showcase-fighter battle-showcase-right">
-                    <BattleFighter />
+                    <CharacterPortraitView character={selectedRight} />
                     <strong>{selectedRight?.name ?? copy.rightCharacter}</strong>
                     <span>{skillSummary(selectedRight)}</span>
                   </div>

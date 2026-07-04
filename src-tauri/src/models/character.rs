@@ -7,11 +7,20 @@ pub struct Character {
     pub creator: String,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub portrait: Option<CharacterPortrait>,
     pub hp: i32,
     pub mp: i32,
     pub skills: CharacterSkills,
     #[serde(default)]
     pub passive: Option<CharacterPassive>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterPortrait {
+    pub file_name: String,
+    pub mime_type: String,
+    pub data_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

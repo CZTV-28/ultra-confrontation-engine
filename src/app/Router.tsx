@@ -4,17 +4,19 @@ import HomePage from "../pages/Home/HomePage";
 import BattlePage from "../pages/Battle/BattlePage";
 import CreatorPage from "../pages/Creator/CreatorPage";
 import RulesPage from "../pages/Rules/RulesPage";
+import ReviewPage from "../pages/Review/ReviewPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
 import ReplayPage from "../pages/Replay/ReplayPage";
 import SettingsPage from "../pages/Settings/SettingsPage";
 
-type Page = "home" | "battle" | "creator" | "rules" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "settings";
 
 const pageMap: Record<string, Page> = {
   "/": "home",
   "/battle": "battle",
   "/creator": "creator",
   "/rules": "rules",
+  "/review": "review",
   "/trainer": "trainer",
   "/replay": "replay",
   "/settings": "settings",
@@ -25,6 +27,7 @@ const pathMap: Record<Page, string> = {
   battle: "/battle",
   creator: "/creator",
   rules: "/rules",
+  review: "/review",
   trainer: "/trainer",
   replay: "/replay",
   settings: "/settings",
@@ -73,6 +76,8 @@ export default function AppRouter() {
         return <CreatorPage {...pageProps} />;
       case "rules":
         return <RulesPage {...pageProps} />;
+      case "review":
+        return <ReviewPage {...pageProps} />;
       case "trainer":
         return <TrainerPage {...pageProps} />;
       case "replay":

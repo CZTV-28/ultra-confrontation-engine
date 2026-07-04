@@ -13,6 +13,7 @@ dist-ssr
 target
 src-tauri/target
 replays/*.ucr
+release/
 *.local
 .env
 .env.*

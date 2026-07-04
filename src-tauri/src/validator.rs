@@ -724,9 +724,9 @@ fn is_file_safe_id(value: &str) -> bool {
     let len = value.len();
     len >= 3
         && len <= 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-')
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-'
+        })
         && value
             .bytes()
             .next()

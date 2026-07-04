@@ -1,6 +1,6 @@
 {
   "id": "circle_500",
-  "name": "原型竞技场",
+  "name": "测试场地",
   "shape": "circle",
   "radius": 250,
   "spawn_points": [

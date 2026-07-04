@@ -99,6 +99,100 @@
   margin-top: 14px;
 }
 
+.creator-portrait-section {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(130, 213, 255, 0.28);
+  background:
+    linear-gradient(90deg, rgba(91, 231, 255, 0.08), rgba(184, 92, 255, 0.08)),
+    rgba(2, 4, 14, 0.62);
+}
+
+.creator-portrait-preview {
+  width: 172px;
+  height: 210px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(130, 213, 255, 0.32);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    rgba(0, 0, 0, 0.5);
+  background-size: 16px 16px;
+}
+
+.creator-portrait-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.22))
+    drop-shadow(0 0 16px rgba(91, 231, 255, 0.14));
+}
+
+.creator-portrait-placeholder {
+  width: 112px;
+  height: 142px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255, 255, 255, 0.24);
+  color: rgba(231, 246, 255, 0.46);
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.creator-portrait-meta {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.creator-portrait-meta span {
+  color: rgba(208, 236, 255, 0.86);
+  font-size: 13px;
+}
+
+.creator-portrait-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-portrait-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.creator-portrait-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(130, 213, 255, 0.38);
+  background: rgba(2, 4, 14, 0.72);
+  color: rgba(231, 246, 255, 0.88);
+  cursor: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+.creator-portrait-actions button:hover {
+  background: rgba(255, 255, 255, 0.92);
+  color: #05050a;
+}
+
+.creator-portrait-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .creator-grid span,
 .creator-wide-field span {
   color: rgba(208, 236, 255, 0.86);
@@ -418,5 +512,13 @@
 
   .creator-mini-table {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .creator-portrait-section {
+    grid-template-columns: 1fr;
+  }
+
+  .creator-portrait-preview {
+    width: 100%;
   }
 }

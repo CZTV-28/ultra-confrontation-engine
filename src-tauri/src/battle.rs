@@ -657,6 +657,7 @@ mod tests {
             name: name.to_string(),
             creator: "test".to_string(),
             description: None,
+            portrait: None,
             hp: 500,
             mp: 250,
             skills: CharacterSkills {
@@ -773,6 +774,7 @@ mod tests {
             name: "Circle500".to_string(),
             shape: "circle".to_string(),
             radius: 250.0,
+            thumbnail: None,
             spawn_points: vec![
                 ArenaPosition { x: -100.0, y: 0.0 },
                 ArenaPosition { x: 100.0, y: 0.0 },

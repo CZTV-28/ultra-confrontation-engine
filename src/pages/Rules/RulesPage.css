@@ -1,33 +1,34 @@
 .rules-shell {
-  width: min(1320px, calc(100vw - 56px));
-  height: min(820px, calc(100vh - 48px));
+  width: min(1380px, calc(100vw - 56px));
+  height: min(830px, calc(100vh - 48px));
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 18px;
+  grid-template-rows: auto minmax(0, 1fr) 30px;
+  gap: 14px;
   color: #f7fbff;
 }
 
 .rules-header {
-  min-height: 140px;
+  min-height: 118px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   background:
-    linear-gradient(100deg, rgba(7, 8, 22, 0.94), rgba(20, 8, 42, 0.9)),
-    radial-gradient(circle at 18% 50%, rgba(91, 231, 255, 0.2), transparent 34%);
+    linear-gradient(100deg, rgba(7, 8, 22, 0.95), rgba(20, 8, 42, 0.9)),
+    radial-gradient(circle at 18% 50%, rgba(255, 200, 87, 0.18), transparent 34%);
   box-shadow:
     inset 0 0 26px rgba(91, 231, 255, 0.08),
     0 0 32px rgba(0, 0, 0, 0.28);
-  padding: 24px 28px;
+  padding: 22px 26px;
+  box-sizing: border-box;
 }
 
 .rules-header p {
-  margin: 0 0 10px;
-  color: rgba(91, 231, 255, 0.88);
+  margin: 0 0 8px;
+  color: rgba(255, 200, 87, 0.94);
   font-size: 13px;
   letter-spacing: 2px;
 }
@@ -35,7 +36,7 @@
 .rules-header h1 {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(34px, 4.2vw, 58px);
+  font-size: clamp(36px, 4.4vw, 60px);
   line-height: 1;
   letter-spacing: 0;
   text-shadow:
@@ -46,18 +47,19 @@
 .rules-header span {
   display: block;
   max-width: 860px;
-  margin-top: 14px;
+  margin-top: 12px;
   color: rgba(226, 243, 255, 0.76);
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .rules-back-button {
-  min-width: 132px;
-  min-height: 44px;
+  min-width: 118px;
+  min-height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 5px;
   background:
-    linear-gradient(90deg, rgba(91, 231, 255, 0.2), rgba(184, 92, 255, 0.18)),
+    linear-gradient(90deg, rgba(255, 200, 87, 0.18), rgba(91, 231, 255, 0.12)),
     rgba(4, 6, 18, 0.9);
   color: #ffffff;
   cursor: none;
@@ -69,43 +71,411 @@
   color: #05050a;
 }
 
-.rules-grid {
+.rules-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.rules-season-panel,
+.rules-detail-panel,
+.rules-event-content,
+.rules-rulebook,
+.rules-season-hero {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(6, 8, 24, 0.93), rgba(12, 6, 28, 0.9)),
+    radial-gradient(circle at 100% 0%, rgba(184, 92, 255, 0.12), transparent 34%);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.035),
+    0 0 24px rgba(0, 0, 0, 0.22);
+}
+
+.rules-season-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.rules-section-title {
+  margin-bottom: 12px;
+  color: rgba(255, 200, 87, 0.92);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.rules-season-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.rules-season-card {
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent),
+    rgba(0, 0, 0, 0.36);
+  color: #ffffff;
+  font: inherit;
+  text-align: left;
+}
+
+.rules-season-card:hover,
+.rules-season-card-active {
+  border-color: rgba(255, 200, 87, 0.62);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.18), rgba(91, 231, 255, 0.08)),
+    rgba(24, 15, 42, 0.88);
+  box-shadow:
+    0 0 18px rgba(255, 200, 87, 0.16),
+    inset 0 0 18px rgba(255, 255, 255, 0.04);
+}
+
+.rules-season-card span {
+  grid-row: 1 / 4;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  color: #ffc857;
+  font-family: "Courier New", monospace;
+  font-size: 17px;
+  font-weight: 800;
+  box-shadow: inset 0 0 12px rgba(255, 200, 87, 0.08);
+}
+
+.rules-season-card strong,
+.rules-season-card em,
+.rules-season-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-season-card strong {
+  font-size: 18px;
+}
+
+.rules-season-card em {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.rules-season-card small {
+  color: rgba(142, 255, 122, 0.9);
+  font-size: 12px;
+}
+
+.rules-detail-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.rules-season-hero {
+  min-height: 116px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 18px;
+  padding: 20px;
+  box-sizing: border-box;
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.14), rgba(91, 231, 255, 0.08)),
+    rgba(0, 0, 0, 0.48);
+}
+
+.rules-season-hero p {
+  margin: 0 0 6px;
+  color: rgba(255, 200, 87, 0.9);
+  font-size: 13px;
+  letter-spacing: 1.4px;
+}
+
+.rules-season-hero h2 {
+  margin: 0;
+  font-size: clamp(30px, 3.2vw, 48px);
+  line-height: 1;
+}
+
+.rules-season-hero span {
+  display: block;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 14px;
+}
+
+.rules-season-badge {
+  min-width: 126px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 14px;
+  text-align: center;
+}
+
+.rules-season-badge-active {
+  border-color: rgba(142, 255, 122, 0.55);
+  background: rgba(142, 255, 122, 0.12);
+  box-shadow: 0 0 18px rgba(142, 255, 122, 0.12);
+}
+
+.rules-season-badge-coming {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.rules-event-content {
+  min-height: 248px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.rules-empty-event,
+.rules-coming-panel {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.rules-roster-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.rules-roster-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(420px, 1.4fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.rules-roster-summary > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 200, 87, 0.24);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.1), rgba(91, 231, 255, 0.04)),
+    rgba(0, 0, 0, 0.34);
+}
+
+.rules-roster-summary strong {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.rules-roster-summary span {
+  color: rgba(226, 243, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rules-roster-summary dl {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.rules-roster-summary dl div {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  min-width: 0;
+  min-height: 68px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.045);
+  box-sizing: border-box;
+}
+
+.rules-roster-summary dt {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rules-roster-summary dd {
+  margin: 0;
+  color: #ffc857;
+  font-family: "Courier New", monospace;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.rules-roster-grid {
+  max-height: 210px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   overflow: auto;
   padding-right: 4px;
-  scrollbar-color: rgba(91, 231, 255, 0.48) rgba(255, 255, 255, 0.08);
+  scrollbar-color: rgba(255, 200, 87, 0.48) rgba(255, 255, 255, 0.08);
+}
+
+.rules-roster-slot {
+  min-width: 0;
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent),
+    rgba(0, 0, 0, 0.42);
+  box-sizing: border-box;
+}
+
+.rules-roster-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rules-roster-slot-head strong {
+  color: rgba(255, 200, 87, 0.94);
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+}
+
+.rules-roster-slot-head span {
+  overflow: hidden;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-roster-slot h3,
+.rules-roster-slot p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-roster-slot h3 {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.rules-roster-slot p {
+  margin: 0;
+  color: rgba(226, 243, 255, 0.64);
+  font-size: 12px;
+}
+
+.rules-roster-slot-empty {
+  opacity: 0.55;
+}
+
+.rules-roster-slot-pending_review {
+  border-color: rgba(255, 200, 87, 0.34);
+}
+
+.rules-roster-slot-approved,
+.rules-roster-slot-imported,
+.rules-roster-slot-trained {
+  border-color: rgba(142, 255, 122, 0.42);
+  box-shadow: inset 0 0 18px rgba(142, 255, 122, 0.04);
+}
+
+.rules-roster-slot-rejected {
+  border-color: rgba(255, 90, 78, 0.46);
+  box-shadow: inset 0 0 18px rgba(255, 90, 78, 0.04);
+}
+
+.rules-rulebook {
+  min-height: 0;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rules-grid {
+  min-height: 0;
+  height: calc(100% - 30px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(255, 200, 87, 0.48) rgba(255, 255, 255, 0.08);
 }
 
 .rules-card {
   position: relative;
-  min-height: 248px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  min-height: 186px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   background:
-    linear-gradient(180deg, rgba(6, 8, 24, 0.93), rgba(12, 6, 28, 0.9)),
-    radial-gradient(circle at 100% 0%, rgba(184, 92, 255, 0.16), transparent 34%);
+    linear-gradient(180deg, rgba(6, 8, 24, 0.76), rgba(12, 6, 28, 0.72)),
+    radial-gradient(circle at 100% 0%, rgba(255, 200, 87, 0.12), transparent 34%);
   box-shadow:
     inset 0 0 18px rgba(255, 255, 255, 0.035),
-    0 0 24px rgba(0, 0, 0, 0.24);
-  padding: 24px 26px 24px 76px;
+    0 0 18px rgba(0, 0, 0, 0.18);
+  padding: 20px 22px 18px 64px;
+  box-sizing: border-box;
 }
 
 .rules-card-index {
   position: absolute;
-  top: 25px;
-  left: 24px;
-  color: rgba(91, 231, 255, 0.86);
+  top: 21px;
+  left: 20px;
+  color: rgba(255, 200, 87, 0.9);
   font-family: "Courier New", monospace;
-  font-size: 22px;
-  text-shadow: 0 0 14px rgba(91, 231, 255, 0.42);
+  font-size: 20px;
+  text-shadow: 0 0 14px rgba(255, 200, 87, 0.38);
 }
 
 .rules-card h2 {
-  margin: 0 0 18px;
+  margin: 0 0 14px;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 19px;
   letter-spacing: 0;
 }
 
@@ -117,21 +487,31 @@
 
 .rules-card li {
   position: relative;
-  margin: 0 0 13px;
+  margin: 0 0 10px;
   color: rgba(226, 243, 255, 0.82);
-  font-size: 15px;
-  line-height: 1.62;
+  font-size: 14px;
+  line-height: 1.52;
 }
 
 .rules-card li::before {
   content: "";
   position: absolute;
   top: 0.72em;
-  left: -22px;
-  width: 9px;
+  left: -18px;
+  width: 8px;
   height: 1px;
-  background: rgba(91, 231, 255, 0.86);
-  box-shadow: 0 0 10px rgba(91, 231, 255, 0.58);
+  background: rgba(255, 200, 87, 0.86);
+  box-shadow: 0 0 10px rgba(255, 200, 87, 0.5);
+}
+
+.rules-footer {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
 }
 
 @media (max-width: 980px) {
@@ -140,12 +520,29 @@
     height: calc(100vh - 30px);
   }
 
-  .rules-header {
+  .rules-header,
+  .rules-season-hero {
     align-items: flex-start;
     flex-direction: column;
   }
 
+  .rules-layout {
+    grid-template-columns: 1fr;
+  }
+
   .rules-grid {
     grid-template-columns: 1fr;
+  }
+
+  .rules-roster-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rules-roster-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rules-roster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

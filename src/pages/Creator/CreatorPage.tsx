@@ -64,6 +64,12 @@ interface PassiveDraft {
   description: string;
 }
 
+interface PortraitDraft {
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+}
+
 const skillKinds: SkillKind[] = ["basic", "melee", "ranged", "block", "dodge", "passive"];
 const basicDamageTable: Record<number, number> = {
   0: 10,
@@ -96,6 +102,11 @@ const copy = {
     hp: "生命",
     mp: "能量",
     description: "角色介绍 / 训练说明",
+    portrait: "角色立绘",
+    uploadPortrait: "上传立绘",
+    clearPortrait: "清除立绘",
+    portraitEmpty: "未上传",
+    portraitFormat: "PNG / JPG / WEBP",
     notes: "AI 训练备注",
     skillName: "技能名",
     mpCost: "耗蓝",
@@ -160,6 +171,11 @@ const copy = {
     hp: "HP",
     mp: "MP",
     description: "Profile / Training Notes",
+    portrait: "Character Portrait",
+    uploadPortrait: "Upload Portrait",
+    clearPortrait: "Clear Portrait",
+    portraitEmpty: "Not Uploaded",
+    portraitFormat: "PNG / JPG / WEBP",
     notes: "AI Training Notes",
     skillName: "Skill Name",
     mpCost: "MP Cost",
@@ -288,6 +304,31 @@ function isTypingTarget(target: EventTarget | null) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
 }
 
+function fileNameFromPath(path: string) {
+  return path.split(/[\\/]/).pop() || "portrait";
+}
+
+function mimeTypeFromFileName(fileName: string) {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  if (extension === "jpg" || extension === "jpeg") {
+    return "image/jpeg";
+  }
+  if (extension === "webp") {
+    return "image/webp";
+  }
+  return "image/png";
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return window.btoa(binary);
+}
+
 async function sha256Hex(value: string) {
   const data = new TextEncoder().encode(value);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -314,6 +355,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       ? "Preferred behavior, combo ideas, weaknesses, and style notes can be written here."
       : "这里填写期望行为、连招思路、弱点、战斗风格和训练要求。",
   );
+  const [portrait, setPortrait] = useState<PortraitDraft>({
+    fileName: "",
+    mimeType: "",
+    dataUrl: "",
+  });
   const hp = 500;
   const mp = 250;
   const [activeSkill, setActiveSkill] = useState<SkillKind>("basic");
@@ -398,6 +444,13 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       name: characterName.trim(),
       creator: creator.trim(),
       description: description.trim(),
+      portrait: portrait.dataUrl
+        ? {
+            file_name: portrait.fileName,
+            mime_type: portrait.mimeType,
+            data_url: portrait.dataUrl,
+          }
+        : null,
       hp,
       mp,
       skills: {
@@ -409,7 +462,22 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       },
       passive: passiveResource,
     }),
-    [block.id, characterName, creator, description, dodge.id, hp, melee.id, mp, passiveResource, ranged.id, resourceId],
+    [
+      block.id,
+      characterName,
+      creator,
+      description,
+      dodge.id,
+      hp,
+      melee.id,
+      mp,
+      passiveResource,
+      portrait.dataUrl,
+      portrait.fileName,
+      portrait.mimeType,
+      ranged.id,
+      resourceId,
+    ],
   );
 
   const combatDesign = useMemo(
@@ -716,6 +784,33 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goBack]);
+
+  const uploadPortrait = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Character Portrait", extensions: ["png", "jpg", "jpeg", "webp"] }],
+      });
+      const selectedPath = Array.isArray(selected) ? selected[0] : selected;
+      if (!selectedPath) {
+        return;
+      }
+
+      const fileName = fileNameFromPath(selectedPath);
+      const mimeType = mimeTypeFromFileName(fileName);
+      const bytes = await readFile(selectedPath);
+      setPortrait({
+        fileName,
+        mimeType,
+        dataUrl: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
+      });
+    } catch (error) {
+      console.error(error);
+      setStatus(t.exportFailed);
+    }
+  };
 
   const exportPackage = async () => {
     if (validationIssues.length > 0) {
@@ -1204,6 +1299,31 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
                   />
                 </label>
               </div>
+              <section className="creator-portrait-section">
+                <div className="creator-portrait-preview">
+                  {portrait.dataUrl ? (
+                    <img src={portrait.dataUrl} alt={portrait.fileName || t.portrait} />
+                  ) : (
+                    <div className="creator-portrait-placeholder">
+                      <span>{t.portraitEmpty}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="creator-portrait-meta">
+                  <span>{t.portrait}</span>
+                  <strong>{portrait.fileName || t.portraitFormat}</strong>
+                  <div className="creator-portrait-actions">
+                    <button type="button" onClick={uploadPortrait}>{t.uploadPortrait}</button>
+                    <button
+                      type="button"
+                      onClick={() => setPortrait({ fileName: "", mimeType: "", dataUrl: "" })}
+                      disabled={!portrait.dataUrl}
+                    >
+                      {t.clearPortrait}
+                    </button>
+                  </div>
+                </div>
+              </section>
               <label className="creator-wide-field">
                 <span>{t.description}</span>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />

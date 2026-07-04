@@ -4,8 +4,9 @@ import UCWindow from "../../components/common/UCWindow/UCWindow";
 import englishLogo from "../../assets/images/ucon-logo-en.png";
 import "./HomePage.css";
 
-type Page = "home" | "battle" | "creator" | "rules" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "settings";
 type SceneId = Page;
+type HomeMode = "participant" | "developer";
 
 interface SceneTone {
   accent: [number, number, number];
@@ -33,6 +34,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
     accent: [255, 200, 87],
     secondary: [91, 231, 255],
     tertiary: [255, 104, 198],
+  },
+  review: {
+    accent: [142, 255, 122],
+    secondary: [255, 200, 87],
+    tertiary: [91, 231, 255],
   },
   trainer: {
     accent: [46, 242, 255],
@@ -123,18 +129,38 @@ function HomeSkull() {
   );
 }
 
+function readInitialHomeMode(): HomeMode {
+  if (typeof window === "undefined") {
+    return "participant";
+  }
+
+  return window.localStorage.getItem("uce_home_mode") === "developer" ? "developer" : "participant";
+}
+
 export default function HomePage({ navigateTo }: HomePageProps) {
   const { i18n } = useTranslation();
+  const [homeMode, setHomeMode] = useState<HomeMode>(() => readInitialHomeMode());
   const [selectedIndex, setSelectedIndex] = useState(0);
   const isEnglish = i18n.language.startsWith("en");
 
   const sidebarItems: SidebarItem[] = useMemo(
-    () => [
-      { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
-      { id: "rules", label: isEnglish ? "S1 Rules" : "S1规则", icon: "R", page: "rules" },
-      { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
-    ],
-    [isEnglish],
+    () =>
+      homeMode === "developer"
+        ? [
+            { id: "battle", label: isEnglish ? "Battle Sim" : "模拟对战", icon: "B", page: "battle" },
+            { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
+            { id: "rules", label: isEnglish ? "Events" : "赛事", icon: "E", page: "rules" },
+            { id: "review", label: isEnglish ? "Official Review" : "官方审核", icon: "V", page: "review" },
+            { id: "trainer", label: isEnglish ? "AI Trainer" : "AI训练", icon: "T", page: "trainer" },
+            { id: "replay", label: isEnglish ? "Replay" : "回放", icon: "P", page: "replay" },
+            { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
+          ]
+        : [
+            { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
+            { id: "rules", label: isEnglish ? "Events" : "赛事", icon: "E", page: "rules" },
+            { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
+          ],
+    [homeMode, isEnglish],
   );
   const activeSceneId = sidebarItems[selectedIndex]?.id ?? "home";
   const [themeTone, setThemeTone] = useState<SceneTone>(() => sceneTones[activeSceneId]);
@@ -204,6 +230,11 @@ export default function HomePage({ navigateTo }: HomePageProps) {
   );
 
   useEffect(() => {
+    window.localStorage.setItem("uce_home_mode", homeMode);
+    setSelectedIndex(0);
+  }, [homeMode]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
@@ -211,6 +242,9 @@ export default function HomePage({ navigateTo }: HomePageProps) {
       } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
         e.preventDefault();
         setSelectedIndex((prev) => (prev === sidebarItems.length - 1 ? 0 : prev + 1));
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        setHomeMode((current) => (current === "participant" ? "developer" : "participant"));
       } else if (e.key === "z" || e.key === "Z" || e.key === "Enter") {
         e.preventDefault();
         const page = sidebarItems[selectedIndex].page;
@@ -222,7 +256,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigateTo, selectedIndex]);
+  }, [navigateTo, selectedIndex, sidebarItems]);
 
   useEffect(() => {
     const fromTone = themeToneRef.current;
@@ -257,6 +291,23 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             <span>UC ENGINE</span>
           </div>
 
+          <div className="home-mode-switch" role="group" aria-label="Home mode">
+            <button
+              className={homeMode === "participant" ? "home-mode-active" : ""}
+              type="button"
+              onClick={() => setHomeMode("participant")}
+            >
+              {isEnglish ? "Player" : "参赛者"}
+            </button>
+            <button
+              className={homeMode === "developer" ? "home-mode-active" : ""}
+              type="button"
+              onClick={() => setHomeMode("developer")}
+            >
+              {isEnglish ? "Dev" : "开发者"}
+            </button>
+          </div>
+
           <nav className="home-nav" aria-label="UCE navigation">
             {sidebarItems.map((item, index) => (
               <button
@@ -272,7 +323,9 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             ))}
           </nav>
 
-          <div className="home-version">v0.1.1 PARTICIPANT</div>
+          <div className="home-version">
+            v0.1.1 {homeMode === "developer" ? "DEVELOPER" : "PARTICIPANT"}
+          </div>
         </aside>
 
         <main className={`home-main-panel home-main-${activeSceneId}`} style={themeStyle}>
@@ -377,7 +430,8 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
         <footer className="home-footer">
           <span><span className="home-footer-heart">♥</span> {isEnglish ? "Confirm" : "确认"}</span>
-          <span><span className="home-footer-x">×</span> {isEnglish ? "Back" : "返回"}</span>
+          <span><span className="home-footer-x">X</span> {isEnglish ? "Back" : "返回"}</span>
+          <span><span className="home-footer-x">Tab</span> {isEnglish ? "Mode" : "模式"}</span>
         </footer>
       </div>
     </UCWindow>

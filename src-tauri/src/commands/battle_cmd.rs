@@ -11,11 +11,12 @@ use crate::validator::{
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -69,6 +70,37 @@ pub struct BattleCommandResult {
     pub turns: Vec<TurnRecord>,
 }
 
+#[derive(Debug, Deserialize)]
+struct OfficialImportPackage {
+    package_type: String,
+    review: OfficialImportReview,
+    official_assets: OfficialImportAssets,
+}
+
+#[derive(Debug, Deserialize)]
+struct OfficialImportReview {
+    official_decision: String,
+    #[serde(default)]
+    errors: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct OfficialImportAssets {
+    character: Value,
+    skills: Vec<Value>,
+    #[serde(default)]
+    passive: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OfficialImportResult {
+    pub character_id: String,
+    pub skill_ids: Vec<String>,
+    pub passive_id: Option<String>,
+    pub written_files: Vec<String>,
+    pub validation: AssetValidationReport,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BattleConfig {
@@ -103,6 +135,109 @@ fn build_asset_validation_report(loader: &Loader) -> Result<AssetValidationRepor
         &rulesets,
         &skills,
     ))
+}
+
+fn runtime_assets_dir() -> PathBuf {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("assets")
+}
+
+fn source_assets_dir() -> Option<PathBuf> {
+    let current = std::env::current_dir().ok()?;
+    if current
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy() == "src-tauri")
+    {
+        return current.parent().map(|parent| parent.join("assets"));
+    }
+
+    if current.join("src-tauri").is_dir() {
+        return Some(current.join("assets"));
+    }
+
+    None
+}
+
+fn official_asset_dirs() -> Vec<PathBuf> {
+    let mut dirs = vec![runtime_assets_dir()];
+    if let Some(source_dir) = source_assets_dir() {
+        if !dirs.iter().any(|dir| dir == &source_dir) {
+            dirs.push(source_dir);
+        }
+    }
+    dirs
+}
+
+fn is_file_safe_asset_id(value: &str) -> bool {
+    let len = value.len();
+    len >= 3
+        && len <= 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_' || byte == b'-'
+        })
+        && value
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+}
+
+fn skill_asset_id(skill: &Skill) -> &str {
+    match skill {
+        Skill::Melee(skill) => &skill.id,
+        Skill::Ranged(skill) => &skill.id,
+        Skill::Block(skill) => &skill.id,
+        Skill::Dodge(skill) => &skill.id,
+    }
+}
+
+fn passive_asset_id(value: &Value) -> Option<String> {
+    value
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn asset_file_path(base_dir: &Path, folder: &str, id: &str) -> Result<PathBuf, String> {
+    if !is_file_safe_asset_id(id) {
+        return Err(format!("资源 ID 不合法，无法写入文件: {}", id));
+    }
+
+    Ok(base_dir.join(folder).join(format!("{}.json", id)))
+}
+
+fn ensure_can_write_asset(
+    base_dir: &Path,
+    folder: &str,
+    id: &str,
+    overwrite: bool,
+) -> Result<(), String> {
+    let path = asset_file_path(base_dir, folder, id)?;
+    if path.exists() && !overwrite {
+        return Err(format!("资源文件已存在，未开启覆盖: {}", path.display()));
+    }
+    Ok(())
+}
+
+fn write_json_asset(
+    base_dir: &Path,
+    folder: &str,
+    id: &str,
+    value: &Value,
+) -> Result<PathBuf, String> {
+    let path = asset_file_path(base_dir, folder, id)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建资源目录失败 {}: {}", parent.display(), e))?;
+    }
+
+    let content =
+        serde_json::to_string_pretty(value).map_err(|e| format!("序列化资源失败 {}: {}", id, e))?;
+    fs::write(&path, format!("{}\n", content))
+        .map_err(|e| format!("写入资源文件失败 {}: {}", path.display(), e))?;
+    Ok(path)
 }
 
 fn ensure_assets_valid(loader: &Loader) -> Result<(), String> {
@@ -312,6 +447,134 @@ pub fn list_skills() -> Result<Vec<Skill>, String> {
 pub fn validate_assets() -> Result<AssetValidationReport, String> {
     let loader = Loader::new();
     build_asset_validation_report(&loader)
+}
+
+#[tauri::command]
+pub fn import_official_package(
+    payload: Value,
+    overwrite: bool,
+) -> Result<OfficialImportResult, String> {
+    let package: OfficialImportPackage =
+        serde_json::from_value(payload).map_err(|e| format!("官方导入包格式不正确: {}", e))?;
+
+    if package.package_type != "uce_official_import_package" {
+        return Err("文件不是 UCE 官方导入包。".to_string());
+    }
+
+    if package.review.official_decision != "approved" {
+        return Err("只有官方审核通过的导入包才能写入资源库。".to_string());
+    }
+
+    if package.review.errors > 0 {
+        return Err("该导入包仍包含硬性错误，不能写入资源库。".to_string());
+    }
+
+    let character: Character = serde_json::from_value(package.official_assets.character.clone())
+        .map_err(|e| format!("解析角色资源失败: {}", e))?;
+
+    if !is_file_safe_asset_id(&character.id) {
+        return Err(format!("角色 ID 不合法: {}", character.id));
+    }
+
+    let mut imported_skills = Vec::new();
+    let mut skill_ids = Vec::new();
+    for skill_value in &package.official_assets.skills {
+        let skill: Skill = serde_json::from_value(skill_value.clone())
+            .map_err(|e| format!("解析技能资源失败: {}", e))?;
+        let skill_id = skill_asset_id(&skill).to_string();
+        if !is_file_safe_asset_id(&skill_id) {
+            return Err(format!("技能 ID 不合法: {}", skill_id));
+        }
+        skill_ids.push(skill_id);
+        imported_skills.push(skill);
+    }
+
+    let passive_value = package
+        .official_assets
+        .passive
+        .as_ref()
+        .filter(|value| !value.is_null())
+        .or_else(|| {
+            package
+                .official_assets
+                .character
+                .get("passive")
+                .filter(|value| value.is_object())
+        });
+    let passive_id = passive_value.and_then(passive_asset_id);
+    if let Some(passive_id) = passive_id.as_ref() {
+        if !is_file_safe_asset_id(passive_id) {
+            return Err(format!("被动 ID 不合法: {}", passive_id));
+        }
+    }
+
+    let loader = Loader::new();
+    let mut characters = loader.load_characters()?;
+    let arenas = loader.load_arenas()?;
+    let rulesets = loader.load_rulesets()?;
+    let mut skills = loader.load_skills()?;
+
+    if overwrite {
+        characters.retain(|existing| existing.id != character.id);
+        skills.retain(|existing| !skill_ids.iter().any(|id| id == skill_asset_id(existing)));
+    }
+
+    characters.push(character.clone());
+    skills.extend(imported_skills.clone());
+
+    let validation = validate_asset_library(&characters, &arenas, &rulesets, &skills);
+    if !validation.valid {
+        return Err(format_validation_errors(&validation));
+    }
+
+    let asset_dirs = official_asset_dirs();
+    for dir in &asset_dirs {
+        ensure_can_write_asset(dir, "characters", &character.id, overwrite)?;
+        for skill_id in &skill_ids {
+            ensure_can_write_asset(dir, "skills", skill_id, overwrite)?;
+        }
+        if let Some(passive_id) = passive_id.as_ref() {
+            ensure_can_write_asset(dir, "passives", passive_id, overwrite)?;
+        }
+    }
+
+    let mut written_files = Vec::new();
+    for dir in &asset_dirs {
+        written_files.push(
+            write_json_asset(
+                dir,
+                "characters",
+                &character.id,
+                &package.official_assets.character,
+            )?
+            .display()
+            .to_string(),
+        );
+
+        for (skill_id, skill_value) in skill_ids.iter().zip(package.official_assets.skills.iter()) {
+            written_files.push(
+                write_json_asset(dir, "skills", skill_id, skill_value)?
+                    .display()
+                    .to_string(),
+            );
+        }
+
+        if let (Some(passive_id), Some(passive_value)) = (passive_id.as_ref(), passive_value) {
+            written_files.push(
+                write_json_asset(dir, "passives", passive_id, passive_value)?
+                    .display()
+                    .to_string(),
+            );
+        }
+    }
+
+    Ok(OfficialImportResult {
+        character_id: character.id,
+        skill_ids,
+        passive_id,
+        written_files,
+        validation,
+    })
 }
 
 #[tauri::command]

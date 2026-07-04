@@ -1,105 +1,281 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
+import { getS1RosterStats, readS1Roster, type S1RosterStatus } from "../../services/s1Roster";
 import "./RulesPage.css";
 
 interface RulesPageProps {
   goBack: () => void;
 }
 
+type Language = "zh" | "en";
+
+interface SeasonEntry {
+  id: string;
+  title: Record<Language, string>;
+  subtitle: Record<Language, string>;
+  status: Record<Language, string>;
+  state: "active" | "coming";
+}
+
+const seasons: SeasonEntry[] = [
+  {
+    id: "S1",
+    title: {
+      zh: "S1：起源",
+      en: "S1: Origin",
+    },
+    subtitle: {
+      zh: "中文社区试点赛季",
+      en: "Chinese community pilot season",
+    },
+    status: {
+      zh: "正在筹备中",
+      en: "Preparing",
+    },
+    state: "active",
+  },
+  {
+    id: "S2",
+    title: {
+      zh: "S2：敬请期待",
+      en: "S2: Coming Soon",
+    },
+    subtitle: {
+      zh: "后续赛季规则预留",
+      en: "Reserved for future season rules",
+    },
+    status: {
+      zh: "敬请期待",
+      en: "Coming soon",
+    },
+    state: "coming",
+  },
+  {
+    id: "S3",
+    title: {
+      zh: "S3：敬请期待",
+      en: "S3: Coming Soon",
+    },
+    subtitle: {
+      zh: "后续赛季规则预留",
+      en: "Reserved for future season rules",
+    },
+    status: {
+      zh: "敬请期待",
+      en: "Coming soon",
+    },
+    state: "coming",
+  },
+  {
+    id: "S4",
+    title: {
+      zh: "S4：敬请期待",
+      en: "S4: Coming Soon",
+    },
+    subtitle: {
+      zh: "后续赛季规则预留",
+      en: "Reserved for future season rules",
+    },
+    status: {
+      zh: "敬请期待",
+      en: "Coming soon",
+    },
+    state: "coming",
+  },
+];
+
 const content = {
   zh: {
-    eyebrow: "UCE S1 ORIGIN",
-    title: "参赛者规则与提交说明",
-    subtitle: "本页面用于参赛者在提交角色设计前快速确认 S1 赛季的硬性限制、审核项和导出流程。",
+    eyebrow: "UC TOURNAMENTS",
+    title: "赛事",
+    subtitle: "这里用于查看当前赛季、历史赛季与对应规则。后续 S2、S3、S4 会在这里逐步解锁。",
     back: "返回",
-    flowTitle: "提交流程",
-    flow: [
-      "进入角色设计模块，填写角色资料、技能参数、被动说明和训练备注。",
-      "确认红色校验项全部消失后，导出 .ucechar 角色信息文件。",
-      "将 .ucechar 文件发送给赛事官方，由官方进行规则审核、训练或导入比赛库。",
-    ],
-    lockedTitle: "S1 固定限制",
-    locked: [
-      "角色生命固定为 500 HP，不允许参赛者手动修改。",
-      "角色能量固定为 250 MP，不允许参赛者手动修改。",
-      "S1 采用 30 轮次模拟，不再设置单轮回合上限。",
-      "远程技能的蓝耗由程序根据伤害、命中率和射程自动计算。",
-    ],
-    skillTitle: "技能审核重点",
-    skills: [
-      "平A是角色固有动作，AI 可以在战斗中决定是否额外花蓝提高伤害。",
-      "近战技能可以选择提高伤害或附加 DEBUFF，但二者不能同时存在。",
-      "远程技能在设计阶段锁定属性，AI 不能在模拟中临时选择强化方向。",
-      "格挡和闪避的反击设计会增加蓝耗，蓝耗先结算，再判断技能结果。",
-      "被动技能由玩家自定义，但每名角色最多一个被动，且被动只能描述一个单一效果元素。",
-    ],
-    packageTitle: "导出文件",
-    package: [
-      ".ucechar 是参赛者提交给官方的角色信息包，不是最终 AI 模型。",
-      "文件内包含角色、技能、被动、训练备注、UCE 版本、S1 规则版本和 SHA-256 校验码。",
-      "官方收到文件后会进行合规审核；含有 DEBUFF、反击或自定义被动的设计需要重点审核。",
+    seasonList: "赛季列表",
+    seasonStatus: "赛季状态",
+    eventContent: "赛事内容",
+    rulesTitle: "S1 规则概览",
+    preparingText: "正在筹备中",
+    comingSoonText: "敬请期待",
+    rosterTitle: "S1 参赛名单",
+    rosterPreparing: "S1：起源正在筹备中，名单将随着官方审核逐步填充。",
+    rosterTotal: "总席位",
+    rosterOccupied: "已登记",
+    rosterApproved: "已通过",
+    rosterPending: "待复核",
+    rosterRejected: "已驳回",
+    rosterEmpty: "空位",
+    creator: "作者",
+    statusLabels: {
+      empty: "空位",
+      pending_review: "待复核",
+      approved: "已通过",
+      rejected: "已驳回",
+      imported: "已导入",
+      trained: "已训练",
+    } satisfies Record<S1RosterStatus, string>,
+    controls: "↑↓/WS 选择赛季 / Z 确认 / X 返回",
+    rules: [
+      {
+        title: "赛制规则",
+        items: [
+          "本赛季采用一对一晋级赛制。",
+          "S1：起源预计累计招募 32 位参赛选手或参赛同人项目。",
+          "每场对局由双方已提交并审核通过的角色进入模拟对抗。",
+        ],
+      },
+      {
+        title: "角色限制",
+        items: [
+          "S1 角色生命固定为 500 HP。",
+          "S1 角色能量固定为 250 MP。",
+          "参赛者不得手动修改 HP / MP 上限。",
+        ],
+      },
+      {
+        title: "模拟规则",
+        items: [
+          "S1 采用 30 轮次模拟。",
+          "取消每轮回合上限，单轮直到分出结果或进入引擎判定。",
+          "最终以胜场更多的一方晋级。",
+        ],
+      },
+      {
+        title: "技能审核",
+        items: [
+          "远程技能属性在设计阶段锁定，蓝耗由程序按曲线计算。",
+          "近战的伤害增强与 DEBUFF 只能二选一。",
+          "格挡、闪避中的反击设计需要人工审核。",
+        ],
+      },
+      {
+        title: "被动审核",
+        items: [
+          "每名角色最多拥有一个自定义被动。",
+          "被动只能描述一个单一效果元素。",
+          "自定义被动必须填写效果说明与平衡审核说明。",
+        ],
+      },
     ],
   },
   en: {
-    eyebrow: "UCE S1 ORIGIN",
-    title: "Participant Rules and Submission Guide",
-    subtitle:
-      "Use this page to confirm S1 hard limits, review items, and the character submission flow before exporting.",
+    eyebrow: "UC TOURNAMENTS",
+    title: "Events",
+    subtitle: "Browse the current season, historical seasons, and their rules. S2, S3, and S4 are reserved for later.",
     back: "Back",
-    flowTitle: "Submission Flow",
-    flow: [
-      "Open Character Forge and fill in profile, skills, passive details, and training notes.",
-      "Export the .ucechar character info file after all red validation items are fixed.",
-      "Send the .ucechar file to tournament officials for review, training, or import into the tournament library.",
-    ],
-    lockedTitle: "S1 Fixed Limits",
-    locked: [
-      "Character HP is fixed at 500 and cannot be manually changed by participants.",
-      "Character MP is fixed at 250 and cannot be manually changed by participants.",
-      "S1 uses 30 simulation rounds with no per-round turn cap.",
-      "Ranged MP cost is calculated automatically from damage, hit rate, and range.",
-    ],
-    skillTitle: "Skill Review Focus",
-    skills: [
-      "Basic attack is intrinsic. The AI may decide during battle whether to spend MP for more damage.",
-      "Melee may boost damage or attach a debuff, but those two choices are mutually exclusive.",
-      "Ranged attributes are locked at design time. The AI cannot choose temporary ranged boosts during simulation.",
-      "Block and dodge counter designs increase MP cost. MP is paid before the skill result is resolved.",
-      "Passives are custom, but each character may have at most one passive with exactly one effect element.",
-    ],
-    packageTitle: "Export File",
-    package: [
-      ".ucechar is the character info package submitted to officials, not the final AI model.",
-      "It contains character data, skills, passive data, training notes, UCE version, S1 rules version, and a SHA-256 checksum.",
-      "Officials review the file for compliance. Debuffs, counters, and custom passives require special attention.",
+    seasonList: "Season List",
+    seasonStatus: "Season Status",
+    eventContent: "Event Content",
+    rulesTitle: "S1 Rules Overview",
+    preparingText: "Preparing",
+    comingSoonText: "Coming soon",
+    rosterTitle: "S1 Participant Roster",
+    rosterPreparing: "S1: Origin is preparing. The roster will fill as official reviews are completed.",
+    rosterTotal: "Total Slots",
+    rosterOccupied: "Registered",
+    rosterApproved: "Approved",
+    rosterPending: "Pending",
+    rosterRejected: "Rejected",
+    rosterEmpty: "Empty",
+    creator: "Creator",
+    statusLabels: {
+      empty: "Empty",
+      pending_review: "Pending",
+      approved: "Approved",
+      rejected: "Rejected",
+      imported: "Imported",
+      trained: "Trained",
+    } satisfies Record<S1RosterStatus, string>,
+    controls: "↑↓/WS Select Season / Z Confirm / X Back",
+    rules: [
+      {
+        title: "Tournament Format",
+        items: [
+          "This season uses a one-on-one elimination format.",
+          "S1: Origin plans to recruit 32 competitors or participating fan projects in total.",
+          "Each match uses submitted and approved characters for simulated combat.",
+        ],
+      },
+      {
+        title: "Character Limits",
+        items: [
+          "S1 character HP is fixed at 500.",
+          "S1 character MP is fixed at 250.",
+          "Participants cannot manually change HP / MP limits.",
+        ],
+      },
+      {
+        title: "Simulation Rules",
+        items: [
+          "S1 uses 30 simulation rounds.",
+          "Per-round turn caps are disabled.",
+          "The side with more round wins advances.",
+        ],
+      },
+      {
+        title: "Skill Review",
+        items: [
+          "Ranged attributes are locked at design time, and MP cost is calculated by curve.",
+          "Melee damage boost and debuff attachment are mutually exclusive.",
+          "Block and dodge counter designs require manual review.",
+        ],
+      },
+      {
+        title: "Passive Review",
+        items: [
+          "Each character may have at most one custom passive.",
+          "A passive may describe only one single effect element.",
+          "Custom passives must include effect text and balance review notes.",
+        ],
+      },
     ],
   },
 };
 
 export default function RulesPage({ goBack }: RulesPageProps) {
   const { i18n } = useTranslation();
-  const lang = i18n.language.startsWith("en") ? "en" : "zh";
+  const lang: Language = i18n.language.startsWith("en") ? "en" : "zh";
   const t = content[lang];
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [s1Roster, setS1Roster] = useState(() => readS1Roster());
+  const selectedSeason = seasons[selectedIndex] ?? seasons[0];
+  const s1RosterStats = useMemo(() => getS1RosterStats(s1Roster), [s1Roster]);
+
+  const visibleRules = useMemo(
+    () => (selectedSeason.id === "S1" ? t.rules : []),
+    [selectedSeason.id, t.rules],
+  );
+
+  useEffect(() => {
+    const refreshRoster = () => setS1Roster(readS1Roster());
+
+    window.addEventListener("focus", refreshRoster);
+    window.addEventListener("uce:s1-roster-updated", refreshRoster);
+    return () => {
+      window.removeEventListener("focus", refreshRoster);
+      window.removeEventListener("uce:s1-roster-updated", refreshRoster);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "x" || e.key === "X") {
         e.preventDefault();
         goBack();
+      } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+        e.preventDefault();
+        setSelectedIndex((current) => (current === 0 ? seasons.length - 1 : current - 1));
+      } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        setSelectedIndex((current) => (current === seasons.length - 1 ? 0 : current + 1));
+      } else if (e.key === "z" || e.key === "Z" || e.key === "Enter") {
+        e.preventDefault();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goBack]);
-
-  const sections = [
-    { title: t.flowTitle, items: t.flow },
-    { title: t.lockedTitle, items: t.locked },
-    { title: t.skillTitle, items: t.skills },
-    { title: t.packageTitle, items: t.package },
-  ];
 
   return (
     <UCWindow>
@@ -115,19 +291,108 @@ export default function RulesPage({ goBack }: RulesPageProps) {
           </button>
         </header>
 
-        <section className="rules-grid">
-          {sections.map((section, sectionIndex) => (
-            <article className="rules-card" key={section.title}>
-              <div className="rules-card-index">{String(sectionIndex + 1).padStart(2, "0")}</div>
-              <h2>{section.title}</h2>
-              <ul>
-                {section.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
+        <section className="rules-layout">
+          <aside className="rules-season-panel">
+            <div className="rules-section-title">{t.seasonList}</div>
+            <div className="rules-season-list">
+              {seasons.map((season, index) => (
+                <button
+                  key={season.id}
+                  className={`rules-season-card ${index === selectedIndex ? "rules-season-card-active" : ""}`}
+                  type="button"
+                  onClick={() => setSelectedIndex(index)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                >
+                  <span>{season.id}</span>
+                  <strong>{season.title[lang]}</strong>
+                  <em>{season.subtitle[lang]}</em>
+                  <small>{season.status[lang]}</small>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <section className="rules-detail-panel">
+            <div className="rules-season-hero">
+              <div>
+                <p>{t.seasonStatus}</p>
+                <h2>{selectedSeason.title[lang]}</h2>
+                <span>{selectedSeason.subtitle[lang]}</span>
+              </div>
+              <strong className={`rules-season-badge rules-season-badge-${selectedSeason.state}`}>
+                {selectedSeason.status[lang]}
+              </strong>
+            </div>
+
+            <section className="rules-event-content">
+              <div className="rules-section-title">{t.eventContent}</div>
+              {selectedSeason.id === "S1" ? (
+                <div className="rules-roster-panel">
+                  <div className="rules-roster-summary">
+                    <div>
+                      <strong>{t.rosterTitle}</strong>
+                      <span>{t.rosterPreparing}</span>
+                    </div>
+                    <dl>
+                      <div><dt>{t.rosterTotal}</dt><dd>{s1RosterStats.total}</dd></div>
+                      <div><dt>{t.rosterOccupied}</dt><dd>{s1RosterStats.occupied}</dd></div>
+                      <div><dt>{t.rosterApproved}</dt><dd>{s1RosterStats.approved}</dd></div>
+                      <div><dt>{t.rosterPending}</dt><dd>{s1RosterStats.pending}</dd></div>
+                      <div><dt>{t.rosterRejected}</dt><dd>{s1RosterStats.rejected}</dd></div>
+                    </dl>
+                  </div>
+
+                  <div className="rules-roster-grid">
+                    {s1Roster.map((slot) => (
+                      <article className={`rules-roster-slot rules-roster-slot-${slot.status}`} key={slot.slot}>
+                        <div className="rules-roster-slot-head">
+                          <strong>#{String(slot.slot).padStart(2, "0")}</strong>
+                          <span>{t.statusLabels[slot.status]}</span>
+                        </div>
+                        {slot.status === "empty" ? (
+                          <p>{t.rosterEmpty}</p>
+                        ) : (
+                          <>
+                            <h3>{slot.characterName || slot.characterId}</h3>
+                            <p>{t.creator}: {slot.creator || "-"}</p>
+                          </>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rules-empty-event">{t.comingSoonText}</div>
+              )}
+            </section>
+
+            <section className="rules-rulebook">
+              <div className="rules-section-title">
+                {selectedSeason.id === "S1" ? t.rulesTitle : t.comingSoonText}
+              </div>
+
+              {visibleRules.length > 0 ? (
+                <div className="rules-grid">
+                  {visibleRules.map((section, sectionIndex) => (
+                    <article className="rules-card" key={section.title}>
+                      <div className="rules-card-index">{String(sectionIndex + 1).padStart(2, "0")}</div>
+                      <h2>{section.title}</h2>
+                      <ul>
+                        {section.items.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="rules-coming-panel">{t.comingSoonText}</div>
+              )}
+            </section>
+          </section>
         </section>
+
+        <footer className="rules-footer">{t.controls}</footer>
       </main>
     </UCWindow>
   );

@@ -19,6 +19,7 @@ pub fn run() {
             battle_cmd::list_rulesets,
             battle_cmd::list_skills,
             battle_cmd::validate_assets,
+            battle_cmd::import_official_package,
             battle_cmd::init_battle,
             battle_cmd::step_battle,
             battle_cmd::finish_battle,
