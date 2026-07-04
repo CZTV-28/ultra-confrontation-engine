@@ -1,6 +1,6 @@
 use crate::models::arena::Arena;
-use crate::models::character::Character;
-use crate::models::passive::{PassiveEffectType, PassiveSkill};
+use crate::models::character::{Character, CharacterPassive};
+use crate::models::passive::PassiveEffectType;
 use crate::models::skill::Skill;
 use crate::physics::{self, Position};
 use crate::rules::RuleEngine;
@@ -47,7 +47,7 @@ pub struct FighterState {
     pub position: Position,
     pub blocked: bool,
     pub dodged: bool,
-    pub passive: Option<PassiveSkill>,
+    pub passive: Option<CharacterPassive>,
     pub active_effects: Vec<ActiveEffect>,
 }
 
@@ -131,7 +131,7 @@ impl BattleEngine {
                 position: spawn_a,
                 blocked: false,
                 dodged: false,
-                passive: None,
+                passive: char_a.passive.clone(),
                 active_effects: Vec::new(),
             },
             fighter_b: FighterState {
@@ -142,7 +142,7 @@ impl BattleEngine {
                 position: spawn_b,
                 blocked: false,
                 dodged: false,
-                passive: None,
+                passive: char_b.passive.clone(),
                 active_effects: Vec::new(),
             },
             rules,
@@ -193,62 +193,11 @@ impl BattleEngine {
     }
 
     fn apply_debuff(
-        attacker: &FighterState,
-        target: &mut FighterState,
+        _attacker: &FighterState,
+        _target: &mut FighterState,
         _damage: i32,
-        rng: &mut impl Rng,
+        _rng: &mut impl Rng,
     ) {
-        if let Some(ref passive) = attacker.passive {
-            let roll: f64 = rng.gen();
-            match passive.effect_type {
-                PassiveEffectType::Bleeding => {
-                    if roll < 0.3 {
-                        let exists = target
-                            .active_effects
-                            .iter()
-                            .any(|e| e.effect_type == PassiveEffectType::Bleeding);
-                        if !exists {
-                            target.active_effects.push(ActiveEffect {
-                                effect_type: PassiveEffectType::Bleeding,
-                                value: passive.value,
-                                remaining_turns: 3,
-                            });
-                        }
-                    }
-                }
-                PassiveEffectType::Slow => {
-                    if roll < 0.3 {
-                        let exists = target
-                            .active_effects
-                            .iter()
-                            .any(|e| e.effect_type == PassiveEffectType::Slow);
-                        if !exists {
-                            target.active_effects.push(ActiveEffect {
-                                effect_type: PassiveEffectType::Slow,
-                                value: passive.value,
-                                remaining_turns: 2,
-                            });
-                        }
-                    }
-                }
-                PassiveEffectType::Vulnerable => {
-                    if roll < 0.3 {
-                        let exists = target
-                            .active_effects
-                            .iter()
-                            .any(|e| e.effect_type == PassiveEffectType::Vulnerable);
-                        if !exists {
-                            target.active_effects.push(ActiveEffect {
-                                effect_type: PassiveEffectType::Vulnerable,
-                                value: passive.value,
-                                remaining_turns: 2,
-                            });
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
     }
 
     fn get_speed_mult(fighter: &FighterState) -> f64 {
@@ -257,22 +206,11 @@ impl BattleEngine {
                 return 1.0 - effect.value;
             }
         }
-        match &fighter.passive {
-            Some(p) if p.effect_type == PassiveEffectType::SpeedUp => 1.0 + p.value,
-            Some(p) if p.effect_type == PassiveEffectType::SpeedDown => 1.0 - p.value,
-            _ => 1.0,
-        }
+        1.0
     }
 
-    fn get_damage_mult(attacker: &FighterState, target: &FighterState) -> f64 {
+    fn get_damage_mult(_attacker: &FighterState, target: &FighterState, _distance: f64) -> f64 {
         let mut mult = 1.0;
-        if let Some(ref p) = attacker.passive {
-            match p.effect_type {
-                PassiveEffectType::DamageUp => mult *= 1.0 + p.value,
-                PassiveEffectType::DamageDown => mult *= 1.0 - p.value,
-                _ => {}
-            }
-        }
         for effect in &target.active_effects {
             if effect.effect_type == PassiveEffectType::Vulnerable {
                 mult *= 1.0 + effect.value;
@@ -362,8 +300,8 @@ impl BattleEngine {
             damage_to_a = 0;
         }
 
-        let mult_a = Self::get_damage_mult(&self.fighter_a, &self.fighter_b);
-        let mult_b = Self::get_damage_mult(&self.fighter_b, &self.fighter_a);
+        let mult_a = Self::get_damage_mult(&self.fighter_a, &self.fighter_b, dist_after_move);
+        let mult_b = Self::get_damage_mult(&self.fighter_b, &self.fighter_a, dist_after_move);
         damage_to_b = (damage_to_b as f64 * mult_a) as i32;
         damage_to_a = (damage_to_a as f64 * mult_b) as i32;
 
@@ -461,7 +399,12 @@ impl BattleEngine {
             }
             Action::BasicAttack { mp_boost } => {
                 let requested_boost = (*mp_boost).clamp(0, self.rules.basic_attack_max_mp_boost());
-                let actual_boost = requested_boost.min(self.fighter_a.mp);
+                let requested_boost = (requested_boost / 5) * 5;
+                let actual_boost = if self.fighter_a.mp >= requested_boost {
+                    requested_boost
+                } else {
+                    0
+                };
                 self.fighter_a.mp -= actual_boost;
                 Action::BasicAttack {
                     mp_boost: actual_boost,
@@ -552,7 +495,12 @@ impl BattleEngine {
             }
             Action::BasicAttack { mp_boost } => {
                 let requested_boost = (*mp_boost).clamp(0, self.rules.basic_attack_max_mp_boost());
-                let actual_boost = requested_boost.min(self.fighter_b.mp);
+                let requested_boost = (requested_boost / 5) * 5;
+                let actual_boost = if self.fighter_b.mp >= requested_boost {
+                    requested_boost
+                } else {
+                    0
+                };
                 self.fighter_b.mp -= actual_boost;
                 Action::BasicAttack {
                     mp_boost: actual_boost,
@@ -603,7 +551,7 @@ impl BattleEngine {
         match action {
             Action::BasicAttack { mp_boost } => {
                 if dist <= 10.0 {
-                    let dmg = self.rules.basic_attack_damage() + mp_boost * 2;
+                    let dmg = self.rules.basic_attack_damage_for_mp_boost(*mp_boost);
                     (dmg, 0.0)
                 } else {
                     (0, 0.0)
@@ -718,6 +666,7 @@ mod tests {
                 dodge: "basic_dodge".to_string(),
                 passive: None,
             },
+            passive: None,
         }
     }
 
@@ -741,22 +690,22 @@ mod tests {
                 skill_constraints: SkillConstraints {
                     basic_attack: BasicAttackConstraints {
                         base_damage: 10,
-                        max_mp_boost: 5,
+                        max_mp_boost: 30,
                     },
                     melee_skill: MeleeConstraints {
                         default_mp_cost: 0,
-                        max_mp_cost: 25,
-                        max_damage: 50,
+                        max_mp_cost: 50,
+                        max_damage: 75,
                     },
                     ranged_skill: RangedConstraints {
-                        default_mp_cost: 25,
-                        default_damage: 50,
-                        min_mp_cost: 10,
-                        max_mp_cost: 50,
+                        default_mp_cost: 50,
+                        default_damage: 75,
+                        min_mp_cost: 25,
+                        max_mp_cost: 100,
                         min_damage: 25,
-                        max_damage: 100,
+                        max_damage: 150,
                         default_hit_rate: 0.6,
-                        min_hit_rate: 0.25,
+                        min_hit_rate: 0.6,
                         max_hit_rate: 1.0,
                         max_knockback: 100,
                     },
@@ -765,7 +714,7 @@ mod tests {
                         max_damage_reduction: 0.75,
                     },
                     dodge_skill: DodgeConstraints {
-                        default_mp_cost: 50,
+                        default_mp_cost: 25,
                         retreat_distance: 100,
                     },
                 },
@@ -777,8 +726,8 @@ mod tests {
         Skill::Melee(MeleeSkill {
             id: "slash".to_string(),
             name: "Slash".to_string(),
-            mp_cost: 10,
-            damage: 35,
+            mp_cost: 0,
+            damage: 25,
             min_mp_cost: None,
             max_mp_cost: None,
             min_damage: None,
@@ -790,16 +739,19 @@ mod tests {
         Skill::Ranged(RangedSkill {
             id: "bolt".to_string(),
             name: "Bolt".to_string(),
-            mp_cost: 25,
-            damage: 50,
+            mp_cost: 50,
+            damage: 75,
             hit_rate: 1.0,
-            knockback: 30,
+            range: Some(100),
+            knockback: 0,
             min_mp_cost: None,
             max_mp_cost: None,
             min_damage: None,
             max_damage: None,
             min_hit_rate: None,
             max_hit_rate: None,
+            min_range: None,
+            max_range: None,
             min_knockback: None,
             max_knockback: None,
         })
@@ -871,7 +823,7 @@ mod tests {
     }
 
     #[test]
-    fn basic_attack_boost_uses_available_mp() {
+    fn basic_attack_boost_requires_full_step_mp() {
         let mut engine = engine(1, 10);
         let mut rng = StdRng::seed_from_u64(1);
         put_fighters_in_melee_range(&mut engine);
@@ -880,10 +832,10 @@ mod tests {
         let result =
             engine.execute_turn(Action::BasicAttack { mp_boost: 5 }, Action::Wait, &mut rng);
 
-        assert_eq!(result.action_a, Action::BasicAttack { mp_boost: 1 });
-        assert_eq!(result.damage_to_b, 12);
-        assert_eq!(result.hp_b_after, 488);
-        assert_eq!(result.mp_a_after, 0);
+        assert_eq!(result.action_a, Action::BasicAttack { mp_boost: 0 });
+        assert_eq!(result.damage_to_b, 10);
+        assert_eq!(result.hp_b_after, 490);
+        assert_eq!(result.mp_a_after, 1);
     }
 
     #[test]

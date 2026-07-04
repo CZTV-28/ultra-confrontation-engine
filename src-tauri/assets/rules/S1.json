@@ -1,6 +1,7 @@
 {
   "season": "S1",
   "name": "起源",
+  "version": "0.1.0",
   "match": {
     "max_rounds": 30,
     "max_turns_per_round": 0
@@ -11,37 +12,118 @@
   },
   "character_defaults": {
     "max_hp": 500,
-    "max_mp": 250
+    "max_mp": 250,
+    "fixed_hp": 500,
+    "fixed_mp": 250,
+    "manual_edit_allowed": false
   },
   "skill_constraints": {
     "basic_attack": {
       "base_damage": 10,
-      "max_mp_boost": 5
+      "min_damage": 10,
+      "max_damage": 40,
+      "min_mp_boost": 0,
+      "max_mp_boost": 30,
+      "mp_step": 5,
+      "damage_table": [
+        { "mp_spend": 0, "damage": 10 },
+        { "mp_spend": 5, "damage": 20 },
+        { "mp_spend": 10, "damage": 26 },
+        { "mp_spend": 15, "damage": 31 },
+        { "mp_spend": 20, "damage": 35 },
+        { "mp_spend": 25, "damage": 38 },
+        { "mp_spend": 30, "damage": 40 }
+      ],
+      "ai_can_spend_mp_in_battle": true
     },
     "melee_skill": {
       "default_mp_cost": 0,
-      "max_mp_cost": 25,
-      "max_damage": 50
+      "default_damage": 25,
+      "min_mp_cost": 0,
+      "max_mp_cost": 50,
+      "mp_step": 5,
+      "min_damage": 10,
+      "max_damage": 75,
+      "range": 10,
+      "cone_angle_degrees": 120,
+      "exclusive_upgrade_rule": "damage_boost_or_debuff_only",
+      "debuff_requires_official_review": true
     },
     "ranged_skill": {
-      "default_mp_cost": 25,
-      "default_damage": 50,
-      "min_mp_cost": 10,
-      "max_mp_cost": 50,
+      "default_mp_cost": 50,
+      "default_damage": 75,
+      "min_mp_cost": 25,
+      "max_mp_cost": 100,
       "min_damage": 25,
-      "max_damage": 100,
+      "max_damage": 150,
       "default_hit_rate": 0.6,
-      "min_hit_rate": 0.25,
+      "min_hit_rate": 0.6,
       "max_hit_rate": 1.0,
-      "max_knockback": 100
+      "default_range": 100,
+      "min_range": 100,
+      "max_range": 200,
+      "mp_step": 5,
+      "manual_mp_input": false,
+      "ai_locked_design": true,
+      "max_knockback": 100,
+      "auto_cost_curve": {
+        "formula": "round5(clamp(50 + damage_delta + hit_delta + range_delta + 5 * boosted_attribute_count, 25, 100))",
+        "damage_delta": "damage above 75 maps linearly to +25 at 150; damage below 75 maps linearly to -25 at 25",
+        "hit_delta": "hit rate from 60% to 100% maps linearly from +0 to +25",
+        "range_delta": "range from 100 to 200 maps linearly from +0 to +15",
+        "boosted_attribute_count": "damage > 75, hit_rate > 0.6, range > 100"
+      }
     },
     "block_skill": {
+      "default_mp_cost": 0,
       "default_damage_reduction": 0.5,
-      "max_damage_reduction": 0.75
+      "min_damage_reduction": 0.5,
+      "max_damage_reduction": 0.75,
+      "mp_step": 5,
+      "max_mp_cost": 80,
+      "max_counter_damage": 75,
+      "mp_paid_before_resolution": true,
+      "counter_cost_curve": "round5(clamp(((reduction - 0.5) / 0.25) * 30 + counter_cost, 0, 80)); counter_cost = 15 + counter_damage / 75 * 35"
     },
     "dodge_skill": {
-      "default_mp_cost": 50,
-      "retreat_distance": 100
+      "default_mp_cost": 25,
+      "retreat_distance": 100,
+      "boosted_retreat_distance": 200,
+      "mp_step": 5,
+      "max_mp_cost": 80,
+      "max_counter_damage": 75,
+      "avoids_damage_types": ["basic_attack", "melee", "ranged"],
+      "counter_cost_curve": "normal dodge costs 25; double retreat costs 50; dash counter costs round5(clamp(25 + 15 + counter_damage / 75 * 35, 40, 80))"
+    },
+    "passive_skill": {
+      "timing": "before_simulation_persistent",
+      "custom_effect_allowed": true,
+      "single_effect_only": true,
+      "effects_array_allowed": false,
+      "official_review_required": true,
+      "required_effect_fields": ["category", "name", "description", "balance_notes"],
+      "optional_effect_fields": ["trigger_condition", "value", "value_unit"],
+      "exclusive_rule": "one passive may describe exactly one custom effect element; examples such as hp regen, mp regen, or proximity debuff are examples only, not fixed allowed types"
     }
+  },
+  "rule_text": {
+    "zh": [
+      "S1 起源赛季采用 30 轮次模拟，max_turns_per_round 为 0 表示取消每轮回合上限。",
+      "人物固有平A基础伤害为 10，可由 AI 在战斗中按 5 点蓝量为单位追加消耗，最高 30 点蓝量，伤害表为 0/10、5/20、10/26、15/31、20/35、25/38、30/40。蓝量不足时回到基础伤害。",
+      "近战技能默认 0 蓝、25 伤害，距离 10 格以内可释放，判定为面向正前方 120 度扇形。增加伤害与挂 DEBUFF 只能二选一，DEBUFF 必须写明效果并交由赛事官方审核。",
+      "远程技能在设计阶段锁定属性，AI 在战斗中不能临时选择强化项目。默认 50 蓝、75 伤害、60% 命中率、100 射程；伤害范围 25-150，命中率 60%-100%，射程 100-200，蓝耗由曲线自动计算且不可手动输入。",
+      "格挡默认 0 蓝，成功格挡减免 50% 伤害，最高可提升到 75%。如设计完美格挡反击，必须额外增加蓝耗；无论对手是否命中或是否攻击，都先结算本次格挡蓝耗。",
+      "闪避默认消耗 25 蓝，闪避本次将受到的平A、近战或远程伤害，并向正后方后撤 100 格；可选择 50 蓝后撤 200 格，或选择冲刺反击，二者不可同时选择。",
+      "被动技能由玩家自定义，在角色进入模拟前生效并持续存在。S1 不预设固定被动类型，只要求每个角色最多拥有一个被动，且该被动只能描述一个单一效果元素。回血、回蓝、靠近易伤等只是示例；如果玩家设计恢复、DEBUFF、强化或其他效果，必须只写一种效果，并填写触发条件、具体说明和平衡审核说明。"
+    ],
+    "en": [
+      "S1 Origin uses 30 simulation rounds. max_turns_per_round set to 0 means there is no per-round turn cap.",
+      "Basic attack is intrinsic to every character. It deals 10 base damage, and the AI may spend MP in battle in steps of 5 up to 30. The damage table is 0/10, 5/20, 10/26, 15/31, 20/35, 25/38, and 30/40. If MP is unavailable, it falls back to base damage.",
+      "Melee skills cost 0 MP and deal 25 damage by default. They can be used within 10 tiles and resolve in a 120-degree forward cone. Damage boost and debuff attachment are mutually exclusive. Debuffs must describe their exact effect and require official review.",
+      "Ranged skill attributes are locked at design time; the AI cannot choose temporary ranged boosts during battle. Defaults are 50 MP, 75 damage, 60% hit rate, and 100 range. Damage is 25-150, hit rate is 60%-100%, range is 100-200, and MP cost is calculated automatically by the balancing curve.",
+      "Block costs 0 MP by default and reduces successful incoming damage by 50%, up to 75%. Perfect guard counterattacks require extra MP. Block MP is paid before resolution, even if the enemy misses or does not attack.",
+      "Dodge costs 25 MP by default, avoids incoming basic, melee, or ranged damage this turn, and retreats 100 tiles backward. It may instead spend 50 MP for 200 retreat distance or choose a dash counter; those two options are mutually exclusive.",
+      "Passive skills are player-defined, become active before simulation starts, and remain active during simulation. S1 does not predefine fixed passive types. Each character may have at most one passive, and that passive may describe exactly one custom effect element. HP regen, MP regen, and proximity vulnerability are examples only. Recovery, debuff, buff, or other designs must be written as one effect with trigger details, effect text, and balance review notes."
+    ]
   }
 }

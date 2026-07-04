@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import HomePage from "../pages/Home/HomePage";
 import BattlePage from "../pages/Battle/BattlePage";
+import CreatorPage from "../pages/Creator/CreatorPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
 import ReplayPage from "../pages/Replay/ReplayPage";
 import SettingsPage from "../pages/Settings/SettingsPage";
 
-type Page = "home" | "battle" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "trainer" | "replay" | "settings";
 
 const pageMap: Record<string, Page> = {
   "/": "home",
   "/battle": "battle",
+  "/creator": "creator",
   "/trainer": "trainer",
   "/replay": "replay",
   "/settings": "settings",
@@ -19,6 +21,7 @@ const pageMap: Record<string, Page> = {
 const pathMap: Record<Page, string> = {
   home: "/",
   battle: "/battle",
+  creator: "/creator",
   trainer: "/trainer",
   replay: "/replay",
   settings: "/settings",
@@ -63,6 +66,8 @@ export default function AppRouter() {
     switch (currentPage) {
       case "battle":
         return <BattlePage {...pageProps} />;
+      case "creator":
+        return <CreatorPage {...pageProps} />;
       case "trainer":
         return <TrainerPage {...pageProps} />;
       case "replay":

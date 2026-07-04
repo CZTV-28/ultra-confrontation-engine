@@ -54,6 +54,7 @@ interface CharacterResource {
   hp: number;
   mp: number;
   skills: CharacterSkills;
+  passive?: PassiveResource | null;
 }
 
 interface ArenaResource {
@@ -84,9 +85,25 @@ type SkillResource = {
   mp_cost: number;
   damage?: number;
   hit_rate?: number;
+  range?: number;
   knockback?: number;
   damage_reduction?: number;
   retreat_distance?: number;
+};
+
+type PassiveResource = {
+  id: string;
+  name: string;
+  type: "passive";
+  effect: {
+    category: string;
+    name: string;
+    description: string;
+    trigger_condition?: string | null;
+    value?: number | null;
+    value_unit?: string | null;
+    balance_notes?: string | null;
+  };
 };
 
 type BattlePhase = "select" | "characterPicker" | "arenaPicker" | "showcase" | "battle";
@@ -147,10 +164,12 @@ const battleCopy = {
     rangedSkill: "远程",
     blockSkill: "格挡",
     dodgeSkill: "闪避",
+    passiveSkill: "被动",
     arenaRadius: "半径",
     damage: "伤害",
     cost: "耗蓝",
     hitRate: "命中",
+    range: "射程",
     knockback: "击退",
     reduction: "减伤",
     retreat: "后撤",
@@ -205,10 +224,12 @@ const battleCopy = {
     rangedSkill: "Ranged",
     blockSkill: "Block",
     dodgeSkill: "Dodge",
+    passiveSkill: "Passive",
     arenaRadius: "Radius",
     damage: "Damage",
     cost: "MP",
     hitRate: "Hit",
+    range: "Range",
     knockback: "Knockback",
     reduction: "Reduction",
     retreat: "Retreat",
@@ -280,13 +301,22 @@ function skillLine(skill: SkillResource | undefined, fallbackId: string, copy: B
   }
   if (skill.type === "ranged") {
     const hitRate = Math.round((skill.hit_rate ?? 0) * 100);
-    return `${skill.name} / ${copy.damage}: ${skill.damage ?? 0} / ${copy.cost}: ${skill.mp_cost} / ${copy.hitRate}: ${hitRate}%`;
+    return `${skill.name} / ${copy.damage}: ${skill.damage ?? 0} / ${copy.cost}: ${skill.mp_cost} / ${copy.hitRate}: ${hitRate}% / ${copy.range}: ${skill.range ?? 100}`;
   }
   if (skill.type === "block") {
     const reduction = Math.round((skill.damage_reduction ?? 0) * 100);
     return `${skill.name} / ${copy.cost}: ${skill.mp_cost} / ${copy.reduction}: ${reduction}%`;
   }
   return `${skill.name} / ${copy.cost}: ${skill.mp_cost} / ${copy.retreat}: ${skill.retreat_distance ?? 0}`;
+}
+
+function passiveLine(passive: PassiveResource): string {
+  const value =
+    passive.effect.value == null
+      ? ""
+      : ` / ${passive.effect.value}${passive.effect.value_unit ? ` ${passive.effect.value_unit}` : ""}`;
+  const trigger = passive.effect.trigger_condition ? ` / ${passive.effect.trigger_condition}` : "";
+  return `${passive.name} / ${passive.effect.category} / ${passive.effect.name}${value}${trigger}`;
 }
 
 function BattleSkull() {
@@ -924,6 +954,12 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                             <span>{skillLine(item.skill, item.fallback, copy)}</span>
                           </div>
                         ))}
+                        {focusedCharacter.passive && (
+                          <div className="battle-skill-detail">
+                            <b>{copy.passiveSkill}</b>
+                            <span>{passiveLine(focusedCharacter.passive)}</span>
+                          </div>
+                        )}
                       </div>
                       <button className="battle-detail-confirm" type="button" onClick={confirmFocusedCharacter}>
                         <span>♥</span>

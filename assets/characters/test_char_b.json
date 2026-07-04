@@ -10,5 +10,6 @@
     "block": "basic_block",
     "dodge": "basic_dodge",
     "passive": null
-  }
+  },
+  "passive": null
 }

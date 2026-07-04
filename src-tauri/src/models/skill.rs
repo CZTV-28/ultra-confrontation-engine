@@ -32,6 +32,8 @@ pub struct RangedSkill {
     pub mp_cost: i32,
     pub damage: i32,
     pub hit_rate: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<i32>,
     pub knockback: i32,
     pub min_mp_cost: Option<i32>,
     pub max_mp_cost: Option<i32>,
@@ -39,6 +41,10 @@ pub struct RangedSkill {
     pub max_damage: Option<i32>,
     pub min_hit_rate: Option<f64>,
     pub max_hit_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_range: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_range: Option<i32>,
     pub min_knockback: Option<i32>,
     pub max_knockback: Option<i32>,
 }

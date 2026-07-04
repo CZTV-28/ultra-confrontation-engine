@@ -40,6 +40,21 @@ impl RuleEngine {
         self.rules.skill_constraints.basic_attack.max_mp_boost
     }
 
+    pub fn basic_attack_damage_for_mp_boost(&self, mp_boost: i32) -> i32 {
+        let spend = mp_boost.clamp(0, self.basic_attack_max_mp_boost());
+        let spend = (spend / 5) * 5;
+
+        match spend {
+            0 => self.basic_attack_damage(),
+            5 => 20,
+            10 => 26,
+            15 => 31,
+            20 => 35,
+            25 => 38,
+            _ => 40,
+        }
+    }
+
     pub fn melee_default_mp_cost(&self) -> i32 {
         self.rules.skill_constraints.melee_skill.default_mp_cost
     }

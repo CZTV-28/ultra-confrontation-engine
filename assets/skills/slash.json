@@ -2,10 +2,10 @@
   "id": "slash",
   "name": "斩击",
   "type": "melee",
-  "mp_cost": 10,
-  "damage": 35,
+  "mp_cost": 0,
+  "damage": 25,
   "min_mp_cost": 0,
-  "max_mp_cost": 25,
+  "max_mp_cost": 50,
   "min_damage": 10,
-  "max_damage": 50
+  "max_damage": 75
 }

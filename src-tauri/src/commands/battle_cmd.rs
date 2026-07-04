@@ -5,6 +5,9 @@ use crate::models::character::Character;
 use crate::models::rules::Rules;
 use crate::models::skill::Skill;
 use crate::rules::RuleEngine;
+use crate::validator::{
+    format_validation_errors, validate_assets as validate_asset_library, AssetValidationReport,
+};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
@@ -86,6 +89,29 @@ pub struct BattleSession {
 
 lazy_static::lazy_static! {
     static ref SESSIONS: Mutex<HashMap<String, BattleSession>> = Mutex::new(HashMap::new());
+}
+
+fn build_asset_validation_report(loader: &Loader) -> Result<AssetValidationReport, String> {
+    let characters = loader.load_characters()?;
+    let arenas = loader.load_arenas()?;
+    let rulesets = loader.load_rulesets()?;
+    let skills = loader.load_skills()?;
+
+    Ok(validate_asset_library(
+        &characters,
+        &arenas,
+        &rulesets,
+        &skills,
+    ))
+}
+
+fn ensure_assets_valid(loader: &Loader) -> Result<(), String> {
+    let report = build_asset_validation_report(loader)?;
+    if report.valid {
+        Ok(())
+    } else {
+        Err(format_validation_errors(&report))
+    }
 }
 
 fn action_name(action: &Action) -> String {
@@ -251,6 +277,7 @@ fn save_replay(replay: &mut ReplayData) {
 #[tauri::command]
 pub fn list_characters() -> Result<Vec<Character>, String> {
     let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
     let mut characters = loader.load_characters()?;
     characters.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
     Ok(characters)
@@ -259,6 +286,7 @@ pub fn list_characters() -> Result<Vec<Character>, String> {
 #[tauri::command]
 pub fn list_arenas() -> Result<Vec<Arena>, String> {
     let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
     let mut arenas = loader.load_arenas()?;
     arenas.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
     Ok(arenas)
@@ -267,6 +295,7 @@ pub fn list_arenas() -> Result<Vec<Arena>, String> {
 #[tauri::command]
 pub fn list_rulesets() -> Result<Vec<Rules>, String> {
     let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
     let mut rulesets = loader.load_rulesets()?;
     rulesets.sort_by(|a, b| a.season.cmp(&b.season));
     Ok(rulesets)
@@ -275,12 +304,20 @@ pub fn list_rulesets() -> Result<Vec<Rules>, String> {
 #[tauri::command]
 pub fn list_skills() -> Result<Vec<Skill>, String> {
     let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
     loader.load_skills()
+}
+
+#[tauri::command]
+pub fn validate_assets() -> Result<AssetValidationReport, String> {
+    let loader = Loader::new();
+    build_asset_validation_report(&loader)
 }
 
 #[tauri::command]
 pub fn init_battle(config: BattleConfig) -> Result<String, String> {
     let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
     let rules = RuleEngine::load(&config.ruleset_id)?;
 
     let char_a = loader.load_character(&config.left_character_id)?;
@@ -342,28 +379,28 @@ pub fn step_battle(session_id: String) -> Result<TurnRecord, String> {
         Action::MoveToward,
         Action::MoveToward,
         Action::MoveToward,
-        Action::BasicAttack { mp_boost: 2 },
-        Action::BasicAttack { mp_boost: 2 },
+        Action::BasicAttack { mp_boost: 5 },
+        Action::BasicAttack { mp_boost: 15 },
         Action::BasicAttack { mp_boost: 0 },
+        Action::MeleeSkill {
+            mp_cost: 0,
+            damage: 25,
+        },
         Action::MeleeSkill {
             mp_cost: 10,
             damage: 35,
         },
-        Action::MeleeSkill {
-            mp_cost: 5,
-            damage: 20,
-        },
         Action::RangedSkill {
-            mp_cost: 25,
-            damage: 50,
+            mp_cost: 50,
+            damage: 75,
             hit_rate: 0.6,
-            knockback: 30,
+            knockback: 0,
         },
         Action::RangedSkill {
-            mp_cost: 15,
-            damage: 30,
-            hit_rate: 0.8,
-            knockback: 15,
+            mp_cost: 70,
+            damage: 110,
+            hit_rate: 0.75,
+            knockback: 0,
         },
         Action::Block {
             mp_cost: 0,
@@ -551,6 +588,13 @@ mod tests {
 
     #[test]
     fn configured_battle_can_start_from_listed_assets() {
+        let report = validate_assets().expect("asset validation should run");
+        assert!(
+            report.valid,
+            "asset validation should pass: {:?}",
+            report.errors
+        );
+
         let characters = list_characters().expect("characters should load");
         let arenas = list_arenas().expect("arenas should load");
         let rulesets = list_rulesets().expect("rulesets should load");

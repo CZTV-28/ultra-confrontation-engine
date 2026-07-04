@@ -149,6 +149,8 @@
 }
 
 .battle-versus-select {
+  width: min(1180px, 100%);
+  margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 80px 1fr;
   align-items: center;
@@ -165,6 +167,7 @@
 .battle-picker-button {
   width: min(340px, 100%);
   min-height: 330px;
+  justify-self: center;
   padding: 18px 16px;
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 6px;

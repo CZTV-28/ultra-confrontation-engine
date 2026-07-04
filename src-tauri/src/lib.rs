@@ -4,6 +4,7 @@ pub mod loader;
 pub mod models;
 pub mod physics;
 pub mod rules;
+pub mod validator;
 
 use commands::battle_cmd;
 
@@ -17,6 +18,7 @@ pub fn run() {
             battle_cmd::list_arenas,
             battle_cmd::list_rulesets,
             battle_cmd::list_skills,
+            battle_cmd::validate_assets,
             battle_cmd::init_battle,
             battle_cmd::step_battle,
             battle_cmd::finish_battle,

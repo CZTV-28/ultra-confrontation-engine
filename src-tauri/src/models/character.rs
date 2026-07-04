@@ -10,6 +10,8 @@ pub struct Character {
     pub hp: i32,
     pub mp: i32,
     pub skills: CharacterSkills,
+    #[serde(default)]
+    pub passive: Option<CharacterPassive>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,4 +21,35 @@ pub struct CharacterSkills {
     pub block: String,
     pub dodge: String,
     pub passive: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CharacterPassive {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub passive_type: String,
+    pub timing: String,
+    pub single_effect: bool,
+    pub effect: CharacterPassiveEffect,
+    pub official_review_required: bool,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CharacterPassiveEffect {
+    pub category: String,
+    pub name: String,
+    pub description: String,
+    #[serde(default)]
+    pub trigger_condition: Option<String>,
+    #[serde(default)]
+    pub value: Option<f64>,
+    #[serde(default)]
+    pub value_unit: Option<String>,
+    #[serde(default)]
+    pub balance_notes: Option<String>,
 }

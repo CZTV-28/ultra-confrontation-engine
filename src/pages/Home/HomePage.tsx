@@ -4,7 +4,7 @@ import UCWindow from "../../components/common/UCWindow/UCWindow";
 import englishLogo from "../../assets/images/ucon-logo-en.png";
 import "./HomePage.css";
 
-type Page = "home" | "battle" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "trainer" | "replay" | "settings";
 type SceneId = Page;
 
 interface SceneTone {
@@ -23,6 +23,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
     accent: [255, 90, 78],
     secondary: [255, 200, 87],
     tertiary: [184, 92, 255],
+  },
+  creator: {
+    accent: [91, 231, 255],
+    secondary: [255, 104, 198],
+    tertiary: [142, 255, 122],
   },
   trainer: {
     accent: [46, 242, 255],
@@ -122,6 +127,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
     () => [
       { id: "home", label: isEnglish ? "Home" : "主页", icon: "⌂", page: "home" },
       { id: "battle", label: isEnglish ? "Simulation" : "模拟", icon: "✚", page: "battle" },
+      { id: "creator", label: isEnglish ? "Character Forge" : "角色工坊", icon: "◆", page: "creator" },
       { id: "trainer", label: isEnglish ? "AI Training" : "AI训练", icon: "✣", page: "trainer" },
       { id: "replay", label: "Replay", icon: "▶", page: "replay" },
       { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "⚙", page: "settings" },
