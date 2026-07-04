@@ -29,8 +29,7 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release
-          project_manifest: src-tauri/Cargo.toml
-          config: src-tauri/release-plz.toml
+          config: release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -59,7 +58,6 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release-pr
-          project_manifest: src-tauri/Cargo.toml
-          config: src-tauri/release-plz.toml
+          config: release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

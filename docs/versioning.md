@@ -121,6 +121,7 @@ For this project:
 - `publish = false` means UCE is not published to crates.io.
 - `release_always = false` means the release job should publish only after a release PR is merged.
 - `CHANGELOG.md` is the shared changelog path.
+- The repository root is a Cargo workspace and `src-tauri` is the Rust/Tauri package member.
 - `v{{ version }}` is the Git tag format.
 
 Important: UCE is a Tauri app, so release-plz can manage the Rust package version and changelog, but release PRs still need human review to keep npm, Tauri, README, and UI version labels in sync.
