@@ -1,0 +1,151 @@
+.rules-shell {
+  width: min(1320px, calc(100vw - 56px));
+  height: min(820px, calc(100vh - 48px));
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  color: #f7fbff;
+}
+
+.rules-header {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(100deg, rgba(7, 8, 22, 0.94), rgba(20, 8, 42, 0.9)),
+    radial-gradient(circle at 18% 50%, rgba(91, 231, 255, 0.2), transparent 34%);
+  box-shadow:
+    inset 0 0 26px rgba(91, 231, 255, 0.08),
+    0 0 32px rgba(0, 0, 0, 0.28);
+  padding: 24px 28px;
+}
+
+.rules-header p {
+  margin: 0 0 10px;
+  color: rgba(91, 231, 255, 0.88);
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+.rules-header h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(34px, 4.2vw, 58px);
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 18px rgba(255, 255, 255, 0.44),
+    0 0 34px rgba(184, 92, 255, 0.28);
+}
+
+.rules-header span {
+  display: block;
+  max-width: 860px;
+  margin-top: 14px;
+  color: rgba(226, 243, 255, 0.76);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.rules-back-button {
+  min-width: 132px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background:
+    linear-gradient(90deg, rgba(91, 231, 255, 0.2), rgba(184, 92, 255, 0.18)),
+    rgba(4, 6, 18, 0.9);
+  color: #ffffff;
+  cursor: none;
+  font: inherit;
+}
+
+.rules-back-button:hover {
+  background: rgba(255, 255, 255, 0.92);
+  color: #05050a;
+}
+
+.rules-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(91, 231, 255, 0.48) rgba(255, 255, 255, 0.08);
+}
+
+.rules-card {
+  position: relative;
+  min-height: 248px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  background:
+    linear-gradient(180deg, rgba(6, 8, 24, 0.93), rgba(12, 6, 28, 0.9)),
+    radial-gradient(circle at 100% 0%, rgba(184, 92, 255, 0.16), transparent 34%);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.035),
+    0 0 24px rgba(0, 0, 0, 0.24);
+  padding: 24px 26px 24px 76px;
+}
+
+.rules-card-index {
+  position: absolute;
+  top: 25px;
+  left: 24px;
+  color: rgba(91, 231, 255, 0.86);
+  font-family: "Courier New", monospace;
+  font-size: 22px;
+  text-shadow: 0 0 14px rgba(91, 231, 255, 0.42);
+}
+
+.rules-card h2 {
+  margin: 0 0 18px;
+  color: #ffffff;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.rules-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rules-card li {
+  position: relative;
+  margin: 0 0 13px;
+  color: rgba(226, 243, 255, 0.82);
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+.rules-card li::before {
+  content: "";
+  position: absolute;
+  top: 0.72em;
+  left: -22px;
+  width: 9px;
+  height: 1px;
+  background: rgba(91, 231, 255, 0.86);
+  box-shadow: 0 0 10px rgba(91, 231, 255, 0.58);
+}
+
+@media (max-width: 980px) {
+  .rules-shell {
+    width: calc(100vw - 28px);
+    height: calc(100vh - 30px);
+  }
+
+  .rules-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rules-grid {
+    grid-template-columns: 1fr;
+  }
+}

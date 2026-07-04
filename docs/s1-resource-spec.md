@@ -22,6 +22,27 @@ The desktop app reads resources from `assets/`. Run `npm run sync:assets` after 
 
 桌面端会读取 `assets/` 下的资源。修改资源后运行 `npm run sync:assets`，把同一份资源同步到 `src-tauri/assets/`。
 
+## 参赛者提交包 / Participant Submission Package
+
+UCE v0.1.1 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件。`.ucechar` 是参赛者提交给赛事官方的角色信息包，不是最终 AI 模型，也不是官方比赛资源库中的最终 `assets/characters/*.json` 文件。
+
+`.ucechar` 文件包含：
+
+- `package_type: "uce_character_submission"`
+- `schema_version: "0.1.1"`
+- `engine_version: "0.1.1"`
+- `target_season: "S1"`
+- `ruleset_version: "0.1.0"`
+- `character`、`skills`、`combat_design`、`passive` 和 `training`
+- `export.checksum_algorithm: "SHA-256"`
+- `export.checksum`：导出时生成的校验码，用于辅助识别文件是否被手动改动
+
+官方收到 `.ucechar` 后，需要进行规则审核、被动/DEBUFF/反击设计审核，再决定是否导入到官方比赛资源库。
+
+UCE v0.1.1 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
+
+After receiving a `.ucechar` file, officials should review rule compliance, custom passive effects, debuffs, and counter designs before importing the character into the official tournament resource library.
+
 ## 中文规则
 
 ### 人物资源

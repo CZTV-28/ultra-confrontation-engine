@@ -3,16 +3,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import HomePage from "../pages/Home/HomePage";
 import BattlePage from "../pages/Battle/BattlePage";
 import CreatorPage from "../pages/Creator/CreatorPage";
+import RulesPage from "../pages/Rules/RulesPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
 import ReplayPage from "../pages/Replay/ReplayPage";
 import SettingsPage from "../pages/Settings/SettingsPage";
 
-type Page = "home" | "battle" | "creator" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "trainer" | "replay" | "settings";
 
 const pageMap: Record<string, Page> = {
   "/": "home",
   "/battle": "battle",
   "/creator": "creator",
+  "/rules": "rules",
   "/trainer": "trainer",
   "/replay": "replay",
   "/settings": "settings",
@@ -22,6 +24,7 @@ const pathMap: Record<Page, string> = {
   home: "/",
   battle: "/battle",
   creator: "/creator",
+  rules: "/rules",
   trainer: "/trainer",
   replay: "/replay",
   settings: "/settings",
@@ -68,6 +71,8 @@ export default function AppRouter() {
         return <BattlePage {...pageProps} />;
       case "creator":
         return <CreatorPage {...pageProps} />;
+      case "rules":
+        return <RulesPage {...pageProps} />;
       case "trainer":
         return <TrainerPage {...pageProps} />;
       case "replay":

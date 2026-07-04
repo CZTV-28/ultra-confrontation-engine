@@ -36,6 +36,14 @@
   --home-tertiary-rgb: 136, 104, 255;
 }
 
+.home-shell-rules {
+  --home-accent: #ffc857;
+  --home-accent-rgb: 255, 200, 87;
+  --home-secondary: #5be7ff;
+  --home-secondary-rgb: 91, 231, 255;
+  --home-tertiary-rgb: 255, 104, 198;
+}
+
 .home-shell-replay {
   --home-accent: #ffffff;
   --home-accent-rgb: 255, 255, 255;

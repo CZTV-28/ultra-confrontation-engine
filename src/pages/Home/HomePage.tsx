@@ -4,7 +4,7 @@ import UCWindow from "../../components/common/UCWindow/UCWindow";
 import englishLogo from "../../assets/images/ucon-logo-en.png";
 import "./HomePage.css";
 
-type Page = "home" | "battle" | "creator" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "trainer" | "replay" | "settings";
 type SceneId = Page;
 
 interface SceneTone {
@@ -28,6 +28,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
     accent: [91, 231, 255],
     secondary: [255, 104, 198],
     tertiary: [142, 255, 122],
+  },
+  rules: {
+    accent: [255, 200, 87],
+    secondary: [91, 231, 255],
+    tertiary: [255, 104, 198],
   },
   trainer: {
     accent: [46, 242, 255],
@@ -125,12 +130,9 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
   const sidebarItems: SidebarItem[] = useMemo(
     () => [
-      { id: "home", label: isEnglish ? "Home" : "主页", icon: "⌂", page: "home" },
-      { id: "battle", label: isEnglish ? "Simulation" : "模拟", icon: "✚", page: "battle" },
-      { id: "creator", label: isEnglish ? "Character Forge" : "角色工坊", icon: "◆", page: "creator" },
-      { id: "trainer", label: isEnglish ? "AI Training" : "AI训练", icon: "✣", page: "trainer" },
-      { id: "replay", label: "Replay", icon: "▶", page: "replay" },
-      { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "⚙", page: "settings" },
+      { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
+      { id: "rules", label: isEnglish ? "S1 Rules" : "S1规则", icon: "R", page: "rules" },
+      { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
     ],
     [isEnglish],
   );
@@ -270,7 +272,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             ))}
           </nav>
 
-          <div className="home-version">v0.1.0</div>
+          <div className="home-version">v0.1.1 PARTICIPANT</div>
         </aside>
 
         <main className={`home-main-panel home-main-${activeSceneId}`} style={themeStyle}>

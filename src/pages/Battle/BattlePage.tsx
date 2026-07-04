@@ -822,7 +822,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
             <h1>{copy.title}</h1>
             <span>{phaseTitle}</span>
           </div>
-          <div className="battle-version">UCE v0.1.0</div>
+          <div className="battle-version">UCE v0.1.1</div>
         </header>
 
         <main className={`battle-grid battle-grid-${phase}`}>

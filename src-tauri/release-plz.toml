@@ -1,0 +1,13 @@
+[workspace]
+git_only = true
+publish = false
+release_always = false
+semver_check = false
+pr_labels = ["release"]
+git_tag_name = "v{{ version }}"
+git_release_name = "UCE v{{ version }}"
+git_release_enable = true
+
+[[package]]
+name = "ultra-confrontation-engine"
+changelog_path = "CHANGELOG.md"

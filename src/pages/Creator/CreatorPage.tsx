@@ -75,15 +75,19 @@ const basicDamageTable: Record<number, number> = {
   30: 40,
 };
 
+const UCE_VERSION = "0.1.1";
+const CHARACTER_SCHEMA_VERSION = "0.1.1";
+const S1_RULESET_VERSION = "0.1.0";
+
 const copy = {
   zh: {
-    title: "角色工坊",
-    subtitle: "S1 角色信息文件生成器",
+    title: "角色设计",
+    subtitle: "S1 参赛角色文件生成器",
     identity: "角色资料",
     combat: "技能参数",
     preview: "资源预览",
-    export: "导出信息文件",
-    exported: "已导出角色信息文件。",
+    export: "导出 .ucechar",
+    exported: "已导出参赛角色文件。",
     exportFailed: "导出失败，请在 Tauri 桌面端运行并确认文件权限。",
     fixIssues: "需要先修正红色校验项。",
     id: "资源 ID",
@@ -130,7 +134,7 @@ const copy = {
     passiveEffectDescription: "单一效果说明",
     balanceNotes: "平衡审核说明",
     passiveDescription: "被动介绍",
-    packageLabel: "信息包",
+    packageLabel: "参赛文件",
     characterLabel: "角色 JSON",
     skillsLabel: "技能 JSON",
     basicNote: "平A为角色固有动作。AI 可在战斗中决定是否额外消耗蓝量提高伤害；蓝量不足时回到 10 点基础伤害。",
@@ -142,12 +146,12 @@ const copy = {
   },
   en: {
     title: "Character Forge",
-    subtitle: "S1 Character Info Generator",
+    subtitle: "S1 Participant Character Generator",
     identity: "Character",
     combat: "Skill Parameters",
     preview: "Resource Preview",
-    export: "Export Info File",
-    exported: "Character info file exported.",
+    export: "Export .ucechar",
+    exported: "Participant character file exported.",
     exportFailed: "Export failed. Run inside the Tauri desktop app and check file permissions.",
     fixIssues: "Fix red validation items before exporting.",
     id: "Resource ID",
@@ -194,7 +198,7 @@ const copy = {
     passiveEffectDescription: "Single Effect Description",
     balanceNotes: "Balance Review Notes",
     passiveDescription: "Passive Intro",
-    packageLabel: "Info Package",
+    packageLabel: "Submission Package",
     characterLabel: "Character JSON",
     skillsLabel: "Skill JSON",
     basicNote: "Basic attack is built into the character. The AI may spend extra MP during battle for more damage; when MP is empty it returns to 10 base damage.",
@@ -282,6 +286,14 @@ function isTypingTarget(target: EventTarget | null) {
     return false;
   }
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
+}
+
+async function sha256Hex(value: string) {
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export default function CreatorPage({ goBack }: CreatorPageProps) {
@@ -544,10 +556,18 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
 
   const infoPackage = useMemo(
     () => ({
-      package_type: "uce_character_info",
-      schema_version: "0.1.0",
+      package_type: "uce_character_submission",
+      file_extension: ".ucechar",
+      schema_version: CHARACTER_SCHEMA_VERSION,
+      engine_version: UCE_VERSION,
       target_season: "S1",
+      ruleset_version: S1_RULESET_VERSION,
       generated_by: "Ultra Confrontation Engine",
+      submission: {
+        status: "player_draft",
+        official_review_required: true,
+        official_review_status: "pending",
+      },
       character: characterResource,
       combat_design: combatDesign,
       passive: passiveResource,
@@ -667,7 +687,20 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     return issues;
   }, [basic, block, characterResource, dodge, hp, lang, melee, mp, passive, ranged, resourceId]);
 
-  const previewText = useMemo(() => JSON.stringify(infoPackage, null, 2), [infoPackage]);
+  const previewPackage = useMemo(
+    () => ({
+      ...infoPackage,
+      export: {
+        format: "ucechar",
+        exported_at: "generated_on_export",
+        checksum_algorithm: "SHA-256",
+        checksum: "generated_on_export",
+      },
+    }),
+    [infoPackage],
+  );
+
+  const previewText = useMemo(() => JSON.stringify(previewPackage, null, 2), [previewPackage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -694,16 +727,34 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
       const path = await save({
-        defaultPath: `${resourceId || "uce_character"}.ucchar.json`,
-        filters: [{ name: "UCE Character Info", extensions: ["json"] }],
+        defaultPath: `${resourceId || "uce_character"}.ucechar`,
+        filters: [{ name: "UCE Character Submission", extensions: ["ucechar"] }],
       });
 
       if (!path) {
         return;
       }
 
-      await writeTextFile(path, previewText);
-      setStatus(t.exported);
+      const unsignedPackage = {
+        ...infoPackage,
+        export: {
+          format: "ucechar",
+          exported_at: new Date().toISOString(),
+          checksum_algorithm: "SHA-256",
+          checksum: null,
+        },
+      };
+      const checksum = await sha256Hex(JSON.stringify(unsignedPackage));
+      const signedPackage = {
+        ...unsignedPackage,
+        export: {
+          ...unsignedPackage.export,
+          checksum,
+        },
+      };
+
+      await writeTextFile(path, JSON.stringify(signedPackage, null, 2));
+      setStatus(`${t.exported} SHA-256: ${checksum.slice(0, 12)}...`);
     } catch (error) {
       console.error(error);
       setStatus(t.exportFailed);
