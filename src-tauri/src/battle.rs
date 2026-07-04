@@ -708,6 +708,7 @@ mod tests {
             id: name.to_string(),
             name: name.to_string(),
             creator: "test".to_string(),
+            description: None,
             hp: 500,
             mp: 250,
             skills: CharacterSkills {

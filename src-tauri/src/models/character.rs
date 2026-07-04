@@ -5,6 +5,8 @@ pub struct Character {
     pub id: String,
     pub name: String,
     pub creator: String,
+    #[serde(default)]
+    pub description: Option<String>,
     pub hp: i32,
     pub mp: i32,
     pub skills: CharacterSkills,

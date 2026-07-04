@@ -16,6 +16,7 @@ pub fn run() {
             battle_cmd::list_characters,
             battle_cmd::list_arenas,
             battle_cmd::list_rulesets,
+            battle_cmd::list_skills,
             battle_cmd::init_battle,
             battle_cmd::step_battle,
             battle_cmd::finish_battle,

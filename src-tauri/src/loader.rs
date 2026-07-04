@@ -69,6 +69,10 @@ impl Loader {
         self.load_collection("rules")
     }
 
+    pub fn load_skills(&self) -> Result<Vec<Skill>, String> {
+        self.load_collection("skills")
+    }
+
     pub fn load_arena(&self, arena_id: &str) -> Result<Arena, String> {
         let path = self
             .assets_dir

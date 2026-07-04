@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
@@ -50,6 +50,7 @@ interface CharacterResource {
   id: string;
   name: string;
   creator: string;
+  description?: string | null;
   hp: number;
   mp: number;
   skills: CharacterSkills;
@@ -76,8 +77,22 @@ interface RulesetResource {
   };
 }
 
-type BattlePhase = "select" | "showcase" | "battle";
+type SkillResource = {
+  id: string;
+  name: string;
+  type: "melee" | "ranged" | "block" | "dodge";
+  mp_cost: number;
+  damage?: number;
+  hit_rate?: number;
+  knockback?: number;
+  damage_reduction?: number;
+  retreat_distance?: number;
+};
+
+type BattlePhase = "select" | "characterPicker" | "arenaPicker" | "showcase" | "battle";
 type Language = "zh" | "en";
+type CharacterSide = "left" | "right";
+type SetupFocus = "left" | "right" | "arena" | "ruleset" | "confirm";
 
 const ARENA_RADIUS = 250;
 const MAX_HP = 500;
@@ -110,7 +125,9 @@ const battleCopy = {
   zh: {
     back: "返回",
     title: "模拟对战",
-    phaseSelect: "选择人物",
+    phaseSelect: "创建模拟",
+    phaseCharacterPicker: "选择人物",
+    phaseArenaPicker: "选择地图",
     phaseShowcase: "人物展示",
     phaseBattle: "模拟对战",
     createSimulation: "创建模拟",
@@ -131,6 +148,17 @@ const battleCopy = {
     blockSkill: "格挡",
     dodgeSkill: "闪避",
     arenaRadius: "半径",
+    damage: "伤害",
+    cost: "耗蓝",
+    hitRate: "命中",
+    knockback: "击退",
+    reduction: "减伤",
+    retreat: "后撤",
+    selected: "已选择",
+    confirmPick: "确认选择",
+    selectLeft: "选择左侧角色",
+    selectRight: "选择右侧角色",
+    noCharacterIntro: "该角色暂无个人介绍。后续角色模板会在这里显示参赛者提交的角色背景、定位和训练说明。",
     dataLoaded: "战斗数据已载入",
     showcaseText: (arenaName: string) =>
       `双方角色将在 ${arenaName} 场地内同时行动。移动、攻击、格挡、闪避与技能判定由 UCE 后端战斗引擎逐回合执行。`,
@@ -143,7 +171,7 @@ const battleCopy = {
     replaySaved: "模拟结束，回放已写入本地记录。",
     logTitle: "战斗日志",
     waitingStart: "等待模拟开始。",
-    roundTurn: (round: number, turn: number) => `第${round}轮 第${turn}回合`,
+    roundTurn: (round: number, turn: number) => `第 ${round} 轮 / 第 ${turn} 回合`,
     simulationFinished: "模拟结束",
     turnsUsed: "使用回合",
     reason: "原因",
@@ -155,7 +183,9 @@ const battleCopy = {
   en: {
     back: "Back",
     title: "Simulation",
-    phaseSelect: "Character Select",
+    phaseSelect: "Create Simulation",
+    phaseCharacterPicker: "Character Select",
+    phaseArenaPicker: "Stage Select",
     phaseShowcase: "Character Showcase",
     phaseBattle: "Battle Simulation",
     createSimulation: "Create Simulation",
@@ -176,6 +206,17 @@ const battleCopy = {
     blockSkill: "Block",
     dodgeSkill: "Dodge",
     arenaRadius: "Radius",
+    damage: "Damage",
+    cost: "MP",
+    hitRate: "Hit",
+    knockback: "Knockback",
+    reduction: "Reduction",
+    retreat: "Retreat",
+    selected: "Selected",
+    confirmPick: "Confirm",
+    selectLeft: "Select Left Character",
+    selectRight: "Select Right Character",
+    noCharacterIntro: "No character profile yet. Future templates will show submitted lore, combat role, and training notes here.",
     dataLoaded: "Battle Data Loaded",
     showcaseText: (arenaName: string) =>
       `Both characters act simultaneously inside the ${arenaName} arena. Movement, attacks, blocks, dodges, and skills are resolved turn by turn by the UCE battle engine.`,
@@ -222,17 +263,30 @@ function toArenaPoint(x: number, y: number, radius: number) {
   };
 }
 
-function skillSummary(character: CharacterResource | undefined, copy: BattleCopy): string {
-  if (!character) {
-    return copy.noResource;
+function clampIndex(index: number, length: number) {
+  if (length <= 0) {
+    return 0;
+  }
+  return ((index % length) + length) % length;
+}
+
+function skillLine(skill: SkillResource | undefined, fallbackId: string, copy: BattleCopy): string {
+  if (!skill) {
+    return fallbackId;
   }
 
-  return [
-    `${copy.meleeSkill}: ${character.skills.melee}`,
-    `${copy.rangedSkill}: ${character.skills.ranged}`,
-    `${copy.blockSkill}: ${character.skills.block}`,
-    `${copy.dodgeSkill}: ${character.skills.dodge}`,
-  ].join(" / ");
+  if (skill.type === "melee") {
+    return `${skill.name} / ${copy.damage}: ${skill.damage ?? 0} / ${copy.cost}: ${skill.mp_cost}`;
+  }
+  if (skill.type === "ranged") {
+    const hitRate = Math.round((skill.hit_rate ?? 0) * 100);
+    return `${skill.name} / ${copy.damage}: ${skill.damage ?? 0} / ${copy.cost}: ${skill.mp_cost} / ${copy.hitRate}: ${hitRate}%`;
+  }
+  if (skill.type === "block") {
+    const reduction = Math.round((skill.damage_reduction ?? 0) * 100);
+    return `${skill.name} / ${copy.cost}: ${skill.mp_cost} / ${copy.reduction}: ${reduction}%`;
+  }
+  return `${skill.name} / ${copy.cost}: ${skill.mp_cost} / ${copy.retreat}: ${skill.retreat_distance ?? 0}`;
 }
 
 function BattleSkull() {
@@ -304,19 +358,27 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const [characters, setCharacters] = useState<CharacterResource[]>([]);
   const [arenas, setArenas] = useState<ArenaResource[]>([]);
   const [rulesets, setRulesets] = useState<RulesetResource[]>([]);
+  const [skills, setSkills] = useState<SkillResource[]>([]);
   const [selectedLeftId, setSelectedLeftId] = useState("");
   const [selectedRightId, setSelectedRightId] = useState("");
   const [selectedArenaId, setSelectedArenaId] = useState("");
   const [selectedRulesetId, setSelectedRulesetId] = useState("");
+  const [activeCharacterSide, setActiveCharacterSide] = useState<CharacterSide>("left");
+  const [focusedCharacterIndex, setFocusedCharacterIndex] = useState(0);
+  const [focusedArenaIndex, setFocusedArenaIndex] = useState(0);
+  const [setupFocus, setSetupFocus] = useState<SetupFocus>("left");
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsLoadFailed, setAssetsLoadFailed] = useState(false);
   const timerRef = useRef<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
+  const skillById = useMemo(() => new Map(skills.map((skill) => [skill.id, skill])), [skills]);
   const selectedLeft = characters.find((character) => character.id === selectedLeftId);
   const selectedRight = characters.find((character) => character.id === selectedRightId);
   const selectedArena = arenas.find((arena) => arena.id === selectedArenaId);
   const selectedRuleset = rulesets.find((ruleset) => ruleset.season === selectedRulesetId);
+  const focusedCharacter = characters[focusedCharacterIndex];
+  const focusedArena = arenas[focusedArenaIndex];
   const maxHp = selectedRuleset?.character_defaults.max_hp ?? MAX_HP;
   const maxMp = selectedRuleset?.character_defaults.max_mp ?? MAX_MP;
   const arenaRadius = selectedArena?.radius ?? ARENA_RADIUS;
@@ -338,6 +400,24 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     : toArenaPoint(spawnB.x, spawnB.y, arenaRadius);
   const battleDelay = battleSpeed <= 0 ? 0 : Math.round(1000 / battleSpeed);
 
+  const getCharacterSkills = (character: CharacterResource | undefined) => {
+    if (!character) {
+      return [];
+    }
+
+    return [
+      { label: copy.meleeSkill, skill: skillById.get(character.skills.melee), fallback: character.skills.melee },
+      { label: copy.rangedSkill, skill: skillById.get(character.skills.ranged), fallback: character.skills.ranged },
+      { label: copy.blockSkill, skill: skillById.get(character.skills.block), fallback: character.skills.block },
+      { label: copy.dodgeSkill, skill: skillById.get(character.skills.dodge), fallback: character.skills.dodge },
+    ];
+  };
+
+  const skillSummary = (character: CharacterResource | undefined) =>
+    getCharacterSkills(character)
+      .map((item) => `${item.label}: ${item.skill?.name ?? item.fallback}`)
+      .join(" / ");
+
   const stopBattle = () => {
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
@@ -354,6 +434,56 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     setPhase("select");
   };
 
+  const openCharacterPicker = (side: CharacterSide) => {
+    const selectedId = side === "left" ? selectedLeftId : selectedRightId;
+    const selectedIndex = characters.findIndex((character) => character.id === selectedId);
+    setActiveCharacterSide(side);
+    setFocusedCharacterIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setPhase("characterPicker");
+  };
+
+  const openArenaPicker = () => {
+    const selectedIndex = arenas.findIndex((arena) => arena.id === selectedArenaId);
+    setFocusedArenaIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setPhase("arenaPicker");
+  };
+
+  const confirmFocusedCharacter = () => {
+    const character = characters[focusedCharacterIndex];
+    if (!character) {
+      return;
+    }
+    if (activeCharacterSide === "left") {
+      setSelectedLeftId(character.id);
+      setSetupFocus("left");
+    } else {
+      setSelectedRightId(character.id);
+      setSetupFocus("right");
+    }
+    setPhase("select");
+  };
+
+  const confirmFocusedArena = () => {
+    const arena = arenas[focusedArenaIndex];
+    if (!arena) {
+      return;
+    }
+    setSelectedArenaId(arena.id);
+    setSetupFocus("arena");
+    setPhase("select");
+  };
+
+  const cycleRuleset = (direction: number) => {
+    if (rulesets.length === 0) {
+      return;
+    }
+    const currentIndex = Math.max(
+      0,
+      rulesets.findIndex((ruleset) => ruleset.season === selectedRulesetId),
+    );
+    setSelectedRulesetId(rulesets[clampIndex(currentIndex + direction, rulesets.length)].season);
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -362,10 +492,11 @@ export default function BattlePage({ goBack }: BattlePageProps) {
       setAssetsLoadFailed(false);
 
       try {
-        const [loadedCharacters, loadedArenas, loadedRulesets] = await Promise.all([
+        const [loadedCharacters, loadedArenas, loadedRulesets, loadedSkills] = await Promise.all([
           invoke<CharacterResource[]>("list_characters"),
           invoke<ArenaResource[]>("list_arenas"),
           invoke<RulesetResource[]>("list_rulesets"),
+          invoke<SkillResource[]>("list_skills"),
         ]);
 
         if (cancelled) {
@@ -375,6 +506,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         setCharacters(loadedCharacters);
         setArenas(loadedArenas);
         setRulesets(loadedRulesets);
+        setSkills(loadedSkills);
         setSelectedLeftId((current) =>
           loadedCharacters.some((character) => character.id === current) ? current : loadedCharacters[0]?.id ?? "",
         );
@@ -481,16 +613,104 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   };
 
   useEffect(() => {
+    const setupOrder: SetupFocus[] = ["left", "right", "arena", "ruleset", "confirm"];
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "x" || e.key === "X") {
-        e.preventDefault();
-        stopBattle();
-        goBack();
-      } else if (e.key === "z" || e.key === "Z" || e.key === "Enter") {
-        e.preventDefault();
-        if (phase === "select" && canConfirmSelection) {
-          setPhase("showcase");
-        } else if (phase === "showcase") {
+      const key = e.key;
+      const isUp = key === "ArrowUp" || key === "w" || key === "W";
+      const isDown = key === "ArrowDown" || key === "s" || key === "S";
+      const isLeft = key === "ArrowLeft" || key === "a" || key === "A";
+      const isRight = key === "ArrowRight" || key === "d" || key === "D";
+      const isConfirm = key === "z" || key === "Z" || key === "Enter";
+      const isBack = key === "x" || key === "X";
+
+      if (!isUp && !isDown && !isLeft && !isRight && !isConfirm && !isBack) {
+        return;
+      }
+
+      e.preventDefault();
+
+      if (phase === "characterPicker") {
+        if (isBack) {
+          setPhase("select");
+          return;
+        }
+        if (isConfirm) {
+          confirmFocusedCharacter();
+          return;
+        }
+        if (characters.length === 0) {
+          return;
+        }
+        if (isLeft || isUp) {
+          setFocusedCharacterIndex((current) => clampIndex(current - 1, characters.length));
+        } else if (isRight || isDown) {
+          setFocusedCharacterIndex((current) => clampIndex(current + 1, characters.length));
+        }
+        return;
+      }
+
+      if (phase === "arenaPicker") {
+        if (isBack) {
+          setPhase("select");
+          return;
+        }
+        if (isConfirm) {
+          confirmFocusedArena();
+          return;
+        }
+        if (arenas.length === 0) {
+          return;
+        }
+        if (isUp || isLeft) {
+          setFocusedArenaIndex((current) => clampIndex(current - 1, arenas.length));
+        } else if (isDown || isRight) {
+          setFocusedArenaIndex((current) => clampIndex(current + 1, arenas.length));
+        }
+        return;
+      }
+
+      if (phase === "select") {
+        if (isBack) {
+          stopBattle();
+          goBack();
+          return;
+        }
+        if (isLeft || isUp) {
+          const currentIndex = setupOrder.indexOf(setupFocus);
+          setSetupFocus(setupOrder[clampIndex(currentIndex - 1, setupOrder.length)]);
+          return;
+        }
+        if (isRight || isDown) {
+          const currentIndex = setupOrder.indexOf(setupFocus);
+          setSetupFocus(setupOrder[clampIndex(currentIndex + 1, setupOrder.length)]);
+          return;
+        }
+        if (isConfirm) {
+          if (setupFocus === "left") {
+            openCharacterPicker("left");
+          } else if (setupFocus === "right") {
+            openCharacterPicker("right");
+          } else if (setupFocus === "arena") {
+            openArenaPicker();
+          } else if (setupFocus === "ruleset") {
+            cycleRuleset(1);
+          } else if (canConfirmSelection) {
+            setPhase("showcase");
+          }
+        }
+        return;
+      }
+
+      if (isBack) {
+        if (phase === "showcase") {
+          setPhase("select");
+        } else {
+          stopBattle();
+          goBack();
+        }
+      } else if (isConfirm) {
+        if (phase === "showcase") {
           startBattle();
         } else if (phase === "battle" && result) {
           resetBattle();
@@ -500,7 +720,18 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canConfirmSelection, goBack, phase, result]);
+  }, [
+    arenas.length,
+    canConfirmSelection,
+    characters.length,
+    focusedArenaIndex,
+    focusedCharacterIndex,
+    goBack,
+    phase,
+    result,
+    setupFocus,
+    selectedRulesetId,
+  ]);
 
   useEffect(() => {
     return () => stopBattle();
@@ -527,7 +758,15 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   }, [flash]);
 
   const phaseTitle =
-    phase === "select" ? copy.phaseSelect : phase === "showcase" ? copy.phaseShowcase : copy.phaseBattle;
+    phase === "characterPicker"
+      ? copy.phaseCharacterPicker
+      : phase === "arenaPicker"
+        ? copy.phaseArenaPicker
+        : phase === "showcase"
+          ? copy.phaseShowcase
+          : phase === "battle"
+            ? copy.phaseBattle
+            : copy.phaseSelect;
 
   return (
     <UCWindow>
@@ -535,7 +774,20 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         {flash && <div className="battle-damage-flash" />}
 
         <header className="battle-header">
-          <button className="battle-back-button" type="button" onClick={goBack}>× {copy.back}</button>
+          <button
+            className="battle-back-button"
+            type="button"
+            onClick={() => {
+              if (phase === "characterPicker" || phase === "arenaPicker" || phase === "showcase") {
+                setPhase("select");
+              } else {
+                stopBattle();
+                goBack();
+              }
+            }}
+          >
+            X {copy.back}
+          </button>
           <div>
             <h1>{copy.title}</h1>
             <span>{phaseTitle}</span>
@@ -555,105 +807,181 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   </div>
                 )}
                 <div className="battle-versus-select">
-                  <div className="battle-picker">
+                  <button
+                    className={`battle-picker battle-picker-button ${setupFocus === "left" ? "battle-setup-focused" : ""}`}
+                    type="button"
+                    onClick={() => openCharacterPicker("left")}
+                    onMouseEnter={() => setSetupFocus("left")}
+                    disabled={assetsLoading || characters.length === 0}
+                  >
                     <h2>{copy.leftCharacter}</h2>
                     <div className="battle-fighter-frame">
-                      <span>‹</span>
                       <BattleFighter />
-                      <span>›</span>
                     </div>
-                    <select
-                      className="battle-select-control"
-                      aria-label={copy.leftCharacter}
-                      value={selectedLeftId}
-                      onChange={(event) => setSelectedLeftId(event.target.value)}
-                      disabled={assetsLoading || characters.length === 0}
-                    >
-                      {characters.length === 0 && <option value="">{copy.noResource}</option>}
-                      {characters.map((character) => (
-                        <option key={character.id} value={character.id}>
-                          {character.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="battle-picker-meta">
-                      <span>{copy.creator}: {selectedLeft?.creator ?? "-"}</span>
-                      <span>{copy.hpLabel}: {selectedLeft?.hp ?? maxHp} / {copy.mpLabel}: {selectedLeft?.mp ?? maxMp}</span>
-                      <span>{copy.skillsLabel}: {skillSummary(selectedLeft, copy)}</span>
-                    </div>
-                  </div>
+                    <strong>{selectedLeft?.name ?? copy.noResource}</strong>
+                    <span>{selectedLeft ? `${copy.creator}: ${selectedLeft.creator}` : copy.noResource}</span>
+                  </button>
+
                   <div className="battle-vs">VS</div>
-                  <div className="battle-picker">
+
+                  <button
+                    className={`battle-picker battle-picker-button ${setupFocus === "right" ? "battle-setup-focused" : ""}`}
+                    type="button"
+                    onClick={() => openCharacterPicker("right")}
+                    onMouseEnter={() => setSetupFocus("right")}
+                    disabled={assetsLoading || characters.length === 0}
+                  >
                     <h2>{copy.rightCharacter}</h2>
                     <div className="battle-fighter-frame">
-                      <span>‹</span>
                       <BattleFighter />
-                      <span>›</span>
                     </div>
-                    <select
-                      className="battle-select-control"
-                      aria-label={copy.rightCharacter}
-                      value={selectedRightId}
-                      onChange={(event) => setSelectedRightId(event.target.value)}
-                      disabled={assetsLoading || characters.length === 0}
-                    >
-                      {characters.length === 0 && <option value="">{copy.noResource}</option>}
-                      {characters.map((character) => (
-                        <option key={character.id} value={character.id}>
-                          {character.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="battle-picker-meta">
-                      <span>{copy.creator}: {selectedRight?.creator ?? "-"}</span>
-                      <span>{copy.hpLabel}: {selectedRight?.hp ?? maxHp} / {copy.mpLabel}: {selectedRight?.mp ?? maxMp}</span>
-                      <span>{copy.skillsLabel}: {skillSummary(selectedRight, copy)}</span>
-                    </div>
-                  </div>
+                    <strong>{selectedRight?.name ?? copy.noResource}</strong>
+                    <span>{selectedRight ? `${copy.creator}: ${selectedRight.creator}` : copy.noResource}</span>
+                  </button>
                 </div>
+
                 <div className="battle-match-config">
-                  <label className="battle-map-select">
-                    <span>{copy.map}</span>
-                    <select
-                      className="battle-select-control"
-                      value={selectedArenaId}
-                      onChange={(event) => setSelectedArenaId(event.target.value)}
-                      disabled={assetsLoading || arenas.length === 0}
-                    >
-                      {arenas.length === 0 && <option value="">{copy.noResource}</option>}
-                      {arenas.map((arena) => (
-                        <option key={arena.id} value={arena.id}>
-                          {arena.name} / {copy.arenaRadius} {arena.radius}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="battle-map-select">
+                  <button
+                    className={`battle-stage-select-button ${setupFocus === "arena" ? "battle-setup-focused" : ""}`}
+                    type="button"
+                    onClick={openArenaPicker}
+                    onMouseEnter={() => setSetupFocus("arena")}
+                    disabled={assetsLoading || arenas.length === 0}
+                  >
+                    <span className="battle-map-thumb" />
+                    <b>{copy.map}</b>
+                    <strong>{selectedArena?.name ?? copy.noResource}</strong>
+                  </button>
+
+                  <button
+                    className={`battle-ruleset-button ${setupFocus === "ruleset" ? "battle-setup-focused" : ""}`}
+                    type="button"
+                    onClick={() => cycleRuleset(1)}
+                    onMouseEnter={() => setSetupFocus("ruleset")}
+                    disabled={assetsLoading || rulesets.length === 0}
+                  >
                     <span>{copy.ruleset}</span>
-                    <select
-                      className="battle-select-control"
-                      value={selectedRulesetId}
-                      onChange={(event) => setSelectedRulesetId(event.target.value)}
-                      disabled={assetsLoading || rulesets.length === 0}
-                    >
-                      {rulesets.length === 0 && <option value="">{copy.noResource}</option>}
-                      {rulesets.map((ruleset) => (
-                        <option key={ruleset.season} value={ruleset.season}>
-                          {ruleset.season} / {ruleset.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <strong>{selectedRuleset ? `${selectedRuleset.season} / ${selectedRuleset.name}` : copy.noResource}</strong>
+                  </button>
                 </div>
+
                 <button
-                  className="battle-primary-button"
+                  className={`battle-primary-button ${setupFocus === "confirm" ? "battle-setup-focused" : ""}`}
                   type="button"
                   onClick={() => canConfirmSelection && setPhase("showcase")}
+                  onMouseEnter={() => setSetupFocus("confirm")}
                   disabled={!canConfirmSelection}
                 >
                   <span>♥</span>
                   {copy.confirmTeam}
                 </button>
+              </div>
+            )}
+
+            {phase === "characterPicker" && (
+              <div className="battle-character-library">
+                <div className="battle-library-grid">
+                  {characters.map((character, index) => (
+                    <button
+                      key={character.id}
+                      className={`battle-character-card ${index === focusedCharacterIndex ? "battle-library-focused" : ""} ${
+                        character.id === selectedLeftId || character.id === selectedRightId ? "battle-library-selected" : ""
+                      }`}
+                      type="button"
+                      onMouseEnter={() => setFocusedCharacterIndex(index)}
+                      onClick={() => setFocusedCharacterIndex(index)}
+                    >
+                      <div className="battle-character-portrait">
+                        <BattleFighter armed={index === focusedCharacterIndex} />
+                      </div>
+                      <strong>{character.name}</strong>
+                      <span>{character.id === selectedLeftId || character.id === selectedRightId ? copy.selected : character.creator}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <aside className="battle-library-detail">
+                  <div className="battle-section-title">
+                    {activeCharacterSide === "left" ? copy.selectLeft : copy.selectRight}
+                  </div>
+                  <div className="battle-rule" />
+                  {focusedCharacter ? (
+                    <>
+                      <div className="battle-detail-portrait">
+                        <BattleFighter armed />
+                      </div>
+                      <h2>{focusedCharacter.name}</h2>
+                      <div className="battle-detail-stats">
+                        <span>{copy.creator}: {focusedCharacter.creator}</span>
+                        <span>{copy.hpLabel}: {focusedCharacter.hp}</span>
+                        <span>{copy.mpLabel}: {focusedCharacter.mp}</span>
+                      </div>
+                      <p className="battle-detail-intro">{focusedCharacter.description || copy.noCharacterIntro}</p>
+                      <div className="battle-skill-detail-list">
+                        {getCharacterSkills(focusedCharacter).map((item) => (
+                          <div key={item.label} className="battle-skill-detail">
+                            <b>{item.label}</b>
+                            <span>{skillLine(item.skill, item.fallback, copy)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="battle-detail-confirm" type="button" onClick={confirmFocusedCharacter}>
+                        <span>♥</span>
+                        {copy.confirmPick}
+                      </button>
+                    </>
+                  ) : (
+                    <p className="battle-detail-intro">{copy.noResource}</p>
+                  )}
+                </aside>
+              </div>
+            )}
+
+            {phase === "arenaPicker" && (
+              <div className="battle-arena-library">
+                <div className="battle-arena-list">
+                  {arenas.map((arena, index) => (
+                    <button
+                      key={arena.id}
+                      className={`battle-arena-card ${index === focusedArenaIndex ? "battle-library-focused" : ""} ${
+                        arena.id === selectedArenaId ? "battle-library-selected" : ""
+                      }`}
+                      type="button"
+                      onMouseEnter={() => setFocusedArenaIndex(index)}
+                      onClick={() => setFocusedArenaIndex(index)}
+                    >
+                      <span className="battle-arena-thumb" />
+                      <span>
+                        <strong>{arena.name}</strong>
+                        <em>{arena.shape} / {copy.arenaRadius} {arena.radius}</em>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <aside className="battle-library-detail">
+                  <div className="battle-section-title">{copy.map}</div>
+                  <div className="battle-rule" />
+                  {focusedArena ? (
+                    <>
+                      <div className="battle-detail-map">
+                        <span className="battle-arena-thumb" />
+                      </div>
+                      <h2>{focusedArena.name}</h2>
+                      <div className="battle-detail-stats">
+                        <span>ID: {focusedArena.id}</span>
+                        <span>{copy.arenaRadius}: {focusedArena.radius}</span>
+                        <span>{focusedArena.shape}</span>
+                      </div>
+                      <button className="battle-detail-confirm" type="button" onClick={confirmFocusedArena}>
+                        <span>♥</span>
+                        {copy.confirmPick}
+                      </button>
+                    </>
+                  ) : (
+                    <p className="battle-detail-intro">{copy.noResource}</p>
+                  )}
+                </aside>
               </div>
             )}
 
@@ -665,13 +993,13 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   <div className="battle-showcase-fighter battle-showcase-left">
                     <BattleFighter armed />
                     <strong>{selectedLeft?.name ?? copy.leftCharacter}</strong>
-                    <span>{skillSummary(selectedLeft, copy)}</span>
+                    <span>{skillSummary(selectedLeft)}</span>
                   </div>
                   <div className="battle-showcase-vs">VS</div>
                   <div className="battle-showcase-fighter battle-showcase-right">
                     <BattleFighter />
                     <strong>{selectedRight?.name ?? copy.rightCharacter}</strong>
-                    <span>{skillSummary(selectedRight, copy)}</span>
+                    <span>{skillSummary(selectedRight)}</span>
                   </div>
                 </div>
                 <div className="battle-showcase-text">
@@ -816,7 +1144,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
         <footer className="battle-footer">
           <span><b>♥</b> {copy.confirmNext}</span>
-          <span><b>×</b> {copy.backHome}</span>
+          <span><b>X</b> {copy.backHome}</span>
           {phase === "battle" && result && <button type="button" onClick={resetBattle}>{copy.restart}</button>}
         </footer>
       </div>

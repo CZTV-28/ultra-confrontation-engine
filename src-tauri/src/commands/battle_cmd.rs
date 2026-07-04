@@ -3,6 +3,7 @@ use crate::loader::Loader;
 use crate::models::arena::Arena;
 use crate::models::character::Character;
 use crate::models::rules::Rules;
+use crate::models::skill::Skill;
 use crate::rules::RuleEngine;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -269,6 +270,12 @@ pub fn list_rulesets() -> Result<Vec<Rules>, String> {
     let mut rulesets = loader.load_rulesets()?;
     rulesets.sort_by(|a, b| a.season.cmp(&b.season));
     Ok(rulesets)
+}
+
+#[tauri::command]
+pub fn list_skills() -> Result<Vec<Skill>, String> {
+    let loader = Loader::new();
+    loader.load_skills()
 }
 
 #[tauri::command]
@@ -547,10 +554,12 @@ mod tests {
         let characters = list_characters().expect("characters should load");
         let arenas = list_arenas().expect("arenas should load");
         let rulesets = list_rulesets().expect("rulesets should load");
+        let skills = list_skills().expect("skills should load");
 
         assert!(!characters.is_empty());
         assert!(!arenas.is_empty());
         assert!(!rulesets.is_empty());
+        assert!(!skills.is_empty());
 
         let left = &characters[0];
         let right = characters.get(1).unwrap_or(left);
