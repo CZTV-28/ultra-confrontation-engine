@@ -1,6 +1,6 @@
 # UCE Versioning and Release Workflow
 
-This document defines how Ultra Confrontation Engine uses Git, GitHub, SemVer, Conventional Commits, and release-plz.
+This document defines how Ultra Confrontation Engine uses Git, GitHub, SemVer, Conventional Commits, and manual GitHub Releases.
 
 ## Branch Model
 
@@ -111,21 +111,19 @@ git push origin main --tags
 
 7. Create a GitHub Release and attach installer files.
 
-## release-plz Role
+## Release Automation Status
 
-release-plz is configured for UCE as a GitHub-based release helper for the Rust/Tauri package.
+UCE currently uses a manual release workflow.
 
-For this project:
+release-plz is not enabled for now. UCE is a Tauri desktop app, not a crates.io library package, and its Rust build script generates Tauri schema files during Cargo package verification. Manual releases are clearer at the current project stage.
 
-- `git_only = true` means releases are based on Git tags, not crates.io.
-- `publish = false` means UCE is not published to crates.io.
-- `publish_no_verify = true` avoids crates.io package verification for the Tauri app package.
-- `release_always = false` means the release job should publish only after a release PR is merged.
-- `CHANGELOG.md` is the shared changelog path.
-- The repository root is a Cargo workspace and `src-tauri` is the Rust/Tauri package member.
-- `v{{ version }}` is the Git tag format.
+The active automation is:
 
-Important: UCE is a Tauri app, so release-plz can manage the Rust package version and changelog, but release PRs still need human review to keep npm, Tauri, README, and UI version labels in sync.
+- CI verifies `main` on each push and pull request.
+- The Windows release workflow builds installer assets when a GitHub Release is published.
+- Version numbers, tags, changelog entries, and release notes are reviewed manually.
+
+This keeps version history explicit while avoiding premature release automation.
 
 ## GitHub Release Assets
 
