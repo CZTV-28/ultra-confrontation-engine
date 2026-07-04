@@ -349,7 +349,7 @@
 
 .home-title-block {
   position: absolute;
-  top: 34px;
+  top: 28px;
   left: 0;
   right: 0;
   z-index: 2;
@@ -358,6 +358,10 @@
   align-items: center;
   pointer-events: none;
   animation: home-logo-rise 0.72s ease-out both;
+}
+
+.home-title-block-en {
+  top: 8px;
 }
 
 @keyframes home-logo-rise {
@@ -387,6 +391,35 @@
   animation:
     home-title-glow 2.8s ease-in-out infinite,
     home-logo-hover 4.8s ease-in-out infinite;
+}
+
+.home-title-image {
+  width: min(72vw, 920px);
+  height: auto;
+  image-rendering: pixelated;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.45))
+    drop-shadow(0 0 26px rgba(187, 122, 255, 0.32))
+    drop-shadow(0 0 44px rgba(64, 216, 255, 0.16));
+  animation:
+    home-logo-image-breathe 3.4s ease-in-out infinite,
+    home-logo-hover 5s ease-in-out infinite;
+}
+
+@keyframes home-logo-image-breathe {
+  0%,
+  100% {
+    filter:
+      drop-shadow(0 0 7px rgba(255, 255, 255, 0.38))
+      drop-shadow(0 0 22px rgba(187, 122, 255, 0.26))
+      drop-shadow(0 0 38px rgba(64, 216, 255, 0.12));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 11px rgba(255, 255, 255, 0.58))
+      drop-shadow(0 0 34px rgba(211, 152, 255, 0.44))
+      drop-shadow(0 0 56px rgba(64, 216, 255, 0.22));
+  }
 }
 
 .home-title span {

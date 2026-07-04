@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
+import englishLogo from "../../assets/images/ucon-logo-en.png";
 import "./HomePage.css";
 
 type Page = "home" | "battle" | "trainer" | "replay" | "settings";
@@ -136,12 +137,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
           <div className={`home-title-block ${isEnglish ? "home-title-block-en" : "home-title-block-zh"}`}>
             {isEnglish ? (
-              <>
-                <div className="home-title">
-                  ULTRA<span>♥</span>
-                </div>
-                <div className="home-title-sub">CONFRONTATION</div>
-              </>
+              <img className="home-title-image" src={englishLogo} alt="Ultra Confrontation" />
             ) : (
               <div className="home-title-zh" aria-label="超类史诗">
                 {"超类史诗".split("").map((char, index) => (
