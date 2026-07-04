@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
@@ -337,11 +337,11 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     return () => stopBattle();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [turns, result]);
+  }, [turns.length, result]);
 
   useEffect(() => {
     if (shake) {
@@ -526,10 +526,10 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                 </div>
               </section>
 
-              <section className="battle-panel battle-log-panel" ref={logRef}>
+              <section className="battle-panel battle-log-panel">
                 <div className="battle-section-title">{copy.logTitle}</div>
                 <div className="battle-rule" />
-                <div className="battle-log-list">
+                <div className="battle-log-list" ref={logRef}>
                   {turns.length === 0 && (
                     <div className="battle-empty-log">
                       <BattleSkull />
