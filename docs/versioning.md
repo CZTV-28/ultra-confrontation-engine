@@ -119,6 +119,7 @@ For this project:
 
 - `git_only = true` means releases are based on Git tags, not crates.io.
 - `publish = false` means UCE is not published to crates.io.
+- `publish_no_verify = true` avoids crates.io package verification for the Tauri app package.
 - `release_always = false` means the release job should publish only after a release PR is merged.
 - `CHANGELOG.md` is the shared changelog path.
 - The repository root is a Cargo workspace and `src-tauri` is the Rust/Tauri package member.

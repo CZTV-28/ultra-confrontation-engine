@@ -1,6 +1,7 @@
 [workspace]
 git_only = true
 publish = false
+publish_no_verify = true
 release_always = false
 semver_check = false
 pr_labels = ["release"]
