@@ -129,6 +129,23 @@
   justify-content: center;
 }
 
+.battle-resource-status {
+  width: min(680px, 100%);
+  margin: 0 auto 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 5px;
+  color: #c9d6ff;
+  font-size: 17px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.battle-resource-error {
+  border-color: rgba(255, 94, 94, 0.74);
+  color: #ffb4b4;
+}
+
 .battle-versus-select {
   display: grid;
   grid-template-columns: 1fr 80px 1fr;
@@ -177,16 +194,40 @@
   right: -38px;
 }
 
-.battle-picker button,
-.battle-map-select button {
+.battle-select-control {
   height: 40px;
+  width: min(260px, 100%);
   min-width: 178px;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 5px;
   background: #050505;
   color: #ffffff;
   font: inherit;
-  font-size: 19px;
+  font-size: 17px;
+  padding: 0 12px;
+}
+
+.battle-select-control:disabled {
+  color: #777777;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.battle-picker-meta {
+  width: min(360px, 100%);
+  min-height: 64px;
+  display: grid;
+  gap: 4px;
+  color: #aeb9e8;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.battle-picker-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .battle-vs {
@@ -195,32 +236,21 @@
   text-align: center;
 }
 
-.battle-map-select {
+.battle-match-config {
   margin-top: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
+  flex-wrap: wrap;
+}
+
+.battle-map-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #ffffff;
   font-size: 24px;
-}
-
-.battle-map-select button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.battle-map-select button span {
-  width: 22px;
-  height: 22px;
-  display: inline-block;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  background:
-    radial-gradient(circle at 48% 48%, #ffffff 0 10%, transparent 11%),
-    repeating-linear-gradient(45deg, #8585ad 0 3px, #282842 3px 6px);
 }
 
 .battle-primary-button {
@@ -243,6 +273,17 @@
 .battle-primary-button span {
   color: #ff3a35;
   text-shadow: 0 0 12px rgba(255, 58, 53, 0.95);
+}
+
+.battle-primary-button:disabled {
+  color: #777777;
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+.battle-primary-button:disabled span {
+  color: #555555;
+  text-shadow: none;
 }
 
 .battle-fighter {

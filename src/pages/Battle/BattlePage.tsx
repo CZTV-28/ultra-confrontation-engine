@@ -38,6 +38,44 @@ interface BattleResult {
   turns: TurnRecord[];
 }
 
+interface CharacterSkills {
+  melee: string;
+  ranged: string;
+  block: string;
+  dodge: string;
+  passive: string | null;
+}
+
+interface CharacterResource {
+  id: string;
+  name: string;
+  creator: string;
+  hp: number;
+  mp: number;
+  skills: CharacterSkills;
+}
+
+interface ArenaResource {
+  id: string;
+  name: string;
+  shape: string;
+  radius: number;
+  spawn_points: Array<{ x: number; y: number }>;
+}
+
+interface RulesetResource {
+  season: string;
+  name: string;
+  match: {
+    max_rounds: number;
+    max_turns_per_round: number;
+  };
+  character_defaults: {
+    max_hp: number;
+    max_mp: number;
+  };
+}
+
 type BattlePhase = "select" | "showcase" | "battle";
 type Language = "zh" | "en";
 
@@ -79,10 +117,23 @@ const battleCopy = {
     leftCharacter: "左侧角色",
     rightCharacter: "右侧角色",
     map: "地图",
+    ruleset: "规则",
     confirmTeam: "确认阵容",
+    assetLoading: "正在读取本地资源库...",
+    assetLoadError: "无法读取角色、地图或规则资源，请在桌面应用中运行。",
+    noResource: "暂无可用资源",
+    creator: "作者",
+    hpLabel: "生命",
+    mpLabel: "能量",
+    skillsLabel: "技能",
+    meleeSkill: "近战",
+    rangedSkill: "远程",
+    blockSkill: "格挡",
+    dodgeSkill: "闪避",
+    arenaRadius: "半径",
     dataLoaded: "战斗数据已载入",
-    showcaseText:
-      "双方角色将在 Circle500 圆形场地内同时行动。移动、攻击、格挡、闪避与技能判定由 UCE 后端战斗引擎逐回合执行。",
+    showcaseText: (arenaName: string) =>
+      `双方角色将在 ${arenaName} 场地内同时行动。移动、攻击、格挡、闪避与技能判定由 UCE 后端战斗引擎逐回合执行。`,
     startSimulation: "开始模拟",
     running: "模拟运行中...",
     winner: "胜者",
@@ -111,10 +162,23 @@ const battleCopy = {
     leftCharacter: "Left Character",
     rightCharacter: "Right Character",
     map: "Map",
+    ruleset: "Ruleset",
     confirmTeam: "Confirm Team",
+    assetLoading: "Reading local asset library...",
+    assetLoadError: "Cannot read characters, arenas, or rulesets. Run this in the desktop app.",
+    noResource: "No available resources",
+    creator: "Creator",
+    hpLabel: "HP",
+    mpLabel: "MP",
+    skillsLabel: "Skills",
+    meleeSkill: "Melee",
+    rangedSkill: "Ranged",
+    blockSkill: "Block",
+    dodgeSkill: "Dodge",
+    arenaRadius: "Radius",
     dataLoaded: "Battle Data Loaded",
-    showcaseText:
-      "Both characters act simultaneously inside the Circle500 arena. Movement, attacks, blocks, dodges, and skills are resolved turn by turn by the UCE battle engine.",
+    showcaseText: (arenaName: string) =>
+      `Both characters act simultaneously inside the ${arenaName} arena. Movement, attacks, blocks, dodges, and skills are resolved turn by turn by the UCE battle engine.`,
     startSimulation: "Start Simulation",
     running: "Simulation running...",
     winner: "Winner",
@@ -135,6 +199,8 @@ const battleCopy = {
   },
 };
 
+type BattleCopy = (typeof battleCopy)[Language];
+
 function translateAction(action: string, lang: Language): string {
   return actionMap[lang][action] ?? action;
 }
@@ -146,14 +212,27 @@ function translateReason(reason: string, lang: Language): string {
   return reason;
 }
 
-function toArenaPoint(x: number, y: number) {
+function toArenaPoint(x: number, y: number, radius: number) {
   const size = 320;
   const padding = 20;
-  const scale = size / (ARENA_RADIUS * 2);
+  const scale = size / (radius * 2);
   return {
-    x: padding + (x + ARENA_RADIUS) * scale,
-    y: padding + (y + ARENA_RADIUS) * scale,
+    x: padding + (x + radius) * scale,
+    y: padding + (y + radius) * scale,
   };
+}
+
+function skillSummary(character: CharacterResource | undefined, copy: BattleCopy): string {
+  if (!character) {
+    return copy.noResource;
+  }
+
+  return [
+    `${copy.meleeSkill}: ${character.skills.melee}`,
+    `${copy.rangedSkill}: ${character.skills.ranged}`,
+    `${copy.blockSkill}: ${character.skills.block}`,
+    `${copy.dodgeSkill}: ${character.skills.dodge}`,
+  ].join(" / ");
 }
 
 function BattleSkull() {
@@ -222,16 +301,41 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [characters, setCharacters] = useState<CharacterResource[]>([]);
+  const [arenas, setArenas] = useState<ArenaResource[]>([]);
+  const [rulesets, setRulesets] = useState<RulesetResource[]>([]);
+  const [selectedLeftId, setSelectedLeftId] = useState("");
+  const [selectedRightId, setSelectedRightId] = useState("");
+  const [selectedArenaId, setSelectedArenaId] = useState("");
+  const [selectedRulesetId, setSelectedRulesetId] = useState("");
+  const [assetsLoading, setAssetsLoading] = useState(true);
+  const [assetsLoadFailed, setAssetsLoadFailed] = useState(false);
   const timerRef = useRef<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
+  const selectedLeft = characters.find((character) => character.id === selectedLeftId);
+  const selectedRight = characters.find((character) => character.id === selectedRightId);
+  const selectedArena = arenas.find((arena) => arena.id === selectedArenaId);
+  const selectedRuleset = rulesets.find((ruleset) => ruleset.season === selectedRulesetId);
+  const maxHp = selectedRuleset?.character_defaults.max_hp ?? MAX_HP;
+  const maxMp = selectedRuleset?.character_defaults.max_mp ?? MAX_MP;
+  const arenaRadius = selectedArena?.radius ?? ARENA_RADIUS;
+  const spawnA = selectedArena?.spawn_points[0] ?? { x: -100, y: 0 };
+  const spawnB = selectedArena?.spawn_points[1] ?? { x: 100, y: 0 };
+  const canConfirmSelection =
+    Boolean(selectedLeft && selectedRight && selectedArena && selectedRuleset) && !assetsLoading && !assetsLoadFailed;
+
   const lastTurn = turns[turns.length - 1];
-  const hpA = lastTurn?.hp_a ?? MAX_HP;
-  const hpB = lastTurn?.hp_b ?? MAX_HP;
-  const mpA = lastTurn?.mp_a ?? MAX_MP;
-  const mpB = lastTurn?.mp_b ?? MAX_MP;
-  const posA = lastTurn ? toArenaPoint(lastTurn.pos_a_x, lastTurn.pos_a_y) : toArenaPoint(-100, 0);
-  const posB = lastTurn ? toArenaPoint(lastTurn.pos_b_x, lastTurn.pos_b_y) : toArenaPoint(100, 0);
+  const hpA = lastTurn?.hp_a ?? maxHp;
+  const hpB = lastTurn?.hp_b ?? maxHp;
+  const mpA = lastTurn?.mp_a ?? maxMp;
+  const mpB = lastTurn?.mp_b ?? maxMp;
+  const posA = lastTurn
+    ? toArenaPoint(lastTurn.pos_a_x, lastTurn.pos_a_y, arenaRadius)
+    : toArenaPoint(spawnA.x, spawnA.y, arenaRadius);
+  const posB = lastTurn
+    ? toArenaPoint(lastTurn.pos_b_x, lastTurn.pos_b_y, arenaRadius)
+    : toArenaPoint(spawnB.x, spawnB.y, arenaRadius);
   const battleDelay = battleSpeed <= 0 ? 0 : Math.round(1000 / battleSpeed);
 
   const stopBattle = () => {
@@ -250,7 +354,65 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     setPhase("select");
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAssets = async () => {
+      setAssetsLoading(true);
+      setAssetsLoadFailed(false);
+
+      try {
+        const [loadedCharacters, loadedArenas, loadedRulesets] = await Promise.all([
+          invoke<CharacterResource[]>("list_characters"),
+          invoke<ArenaResource[]>("list_arenas"),
+          invoke<RulesetResource[]>("list_rulesets"),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setCharacters(loadedCharacters);
+        setArenas(loadedArenas);
+        setRulesets(loadedRulesets);
+        setSelectedLeftId((current) =>
+          loadedCharacters.some((character) => character.id === current) ? current : loadedCharacters[0]?.id ?? "",
+        );
+        setSelectedRightId((current) =>
+          loadedCharacters.some((character) => character.id === current)
+            ? current
+            : loadedCharacters[1]?.id ?? loadedCharacters[0]?.id ?? "",
+        );
+        setSelectedArenaId((current) =>
+          loadedArenas.some((arena) => arena.id === current) ? current : loadedArenas[0]?.id ?? "",
+        );
+        setSelectedRulesetId((current) =>
+          loadedRulesets.some((ruleset) => ruleset.season === current) ? current : loadedRulesets[0]?.season ?? "",
+        );
+      } catch {
+        if (!cancelled) {
+          setAssetsLoadFailed(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setAssetsLoading(false);
+        }
+      }
+    };
+
+    loadAssets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startBattle = async () => {
+    if (!canConfirmSelection) {
+      setErrorMessage(copy.assetLoadError);
+      return;
+    }
+
     stopBattle();
     setTurns([]);
     setResult(null);
@@ -259,7 +421,14 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     setRunning(true);
 
     try {
-      const id = await invoke<string>("init_battle");
+      const id = await invoke<string>("init_battle", {
+        config: {
+          leftCharacterId: selectedLeftId,
+          rightCharacterId: selectedRightId,
+          arenaId: selectedArenaId,
+          rulesetId: selectedRulesetId,
+        },
+      });
 
       if (battleSpeed <= 0) {
         const completedTurns: TurnRecord[] = [];
@@ -319,7 +488,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         goBack();
       } else if (e.key === "z" || e.key === "Z" || e.key === "Enter") {
         e.preventDefault();
-        if (phase === "select") {
+        if (phase === "select" && canConfirmSelection) {
           setPhase("showcase");
         } else if (phase === "showcase") {
           startBattle();
@@ -331,7 +500,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goBack, phase, result]);
+  }, [canConfirmSelection, goBack, phase, result]);
 
   useEffect(() => {
     return () => stopBattle();
@@ -380,6 +549,11 @@ export default function BattlePage({ goBack }: BattlePageProps) {
               <div className="battle-selection">
                 <div className="battle-section-title">{copy.createSimulation}</div>
                 <div className="battle-rule" />
+                {(assetsLoading || assetsLoadFailed) && (
+                  <div className={`battle-resource-status ${assetsLoadFailed ? "battle-resource-error" : ""}`}>
+                    {assetsLoading ? copy.assetLoading : copy.assetLoadError}
+                  </div>
+                )}
                 <div className="battle-versus-select">
                   <div className="battle-picker">
                     <h2>{copy.leftCharacter}</h2>
@@ -388,7 +562,25 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                       <BattleFighter />
                       <span>›</span>
                     </div>
-                    <button type="button">DummyA ▾</button>
+                    <select
+                      className="battle-select-control"
+                      aria-label={copy.leftCharacter}
+                      value={selectedLeftId}
+                      onChange={(event) => setSelectedLeftId(event.target.value)}
+                      disabled={assetsLoading || characters.length === 0}
+                    >
+                      {characters.length === 0 && <option value="">{copy.noResource}</option>}
+                      {characters.map((character) => (
+                        <option key={character.id} value={character.id}>
+                          {character.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="battle-picker-meta">
+                      <span>{copy.creator}: {selectedLeft?.creator ?? "-"}</span>
+                      <span>{copy.hpLabel}: {selectedLeft?.hp ?? maxHp} / {copy.mpLabel}: {selectedLeft?.mp ?? maxMp}</span>
+                      <span>{copy.skillsLabel}: {skillSummary(selectedLeft, copy)}</span>
+                    </div>
                   </div>
                   <div className="battle-vs">VS</div>
                   <div className="battle-picker">
@@ -398,14 +590,67 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                       <BattleFighter />
                       <span>›</span>
                     </div>
-                    <button type="button">DummyB ▾</button>
+                    <select
+                      className="battle-select-control"
+                      aria-label={copy.rightCharacter}
+                      value={selectedRightId}
+                      onChange={(event) => setSelectedRightId(event.target.value)}
+                      disabled={assetsLoading || characters.length === 0}
+                    >
+                      {characters.length === 0 && <option value="">{copy.noResource}</option>}
+                      {characters.map((character) => (
+                        <option key={character.id} value={character.id}>
+                          {character.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="battle-picker-meta">
+                      <span>{copy.creator}: {selectedRight?.creator ?? "-"}</span>
+                      <span>{copy.hpLabel}: {selectedRight?.hp ?? maxHp} / {copy.mpLabel}: {selectedRight?.mp ?? maxMp}</span>
+                      <span>{copy.skillsLabel}: {skillSummary(selectedRight, copy)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="battle-map-select">
-                  <span>{copy.map}</span>
-                  <button type="button"><span /> Circle500 ▾</button>
+                <div className="battle-match-config">
+                  <label className="battle-map-select">
+                    <span>{copy.map}</span>
+                    <select
+                      className="battle-select-control"
+                      value={selectedArenaId}
+                      onChange={(event) => setSelectedArenaId(event.target.value)}
+                      disabled={assetsLoading || arenas.length === 0}
+                    >
+                      {arenas.length === 0 && <option value="">{copy.noResource}</option>}
+                      {arenas.map((arena) => (
+                        <option key={arena.id} value={arena.id}>
+                          {arena.name} / {copy.arenaRadius} {arena.radius}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="battle-map-select">
+                    <span>{copy.ruleset}</span>
+                    <select
+                      className="battle-select-control"
+                      value={selectedRulesetId}
+                      onChange={(event) => setSelectedRulesetId(event.target.value)}
+                      disabled={assetsLoading || rulesets.length === 0}
+                    >
+                      {rulesets.length === 0 && <option value="">{copy.noResource}</option>}
+                      {rulesets.map((ruleset) => (
+                        <option key={ruleset.season} value={ruleset.season}>
+                          {ruleset.season} / {ruleset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-                <button className="battle-primary-button" type="button" onClick={() => setPhase("showcase")}>
+                <button
+                  className="battle-primary-button"
+                  type="button"
+                  onClick={() => canConfirmSelection && setPhase("showcase")}
+                  disabled={!canConfirmSelection}
+                >
                   <span>♥</span>
                   {copy.confirmTeam}
                 </button>
@@ -419,19 +664,19 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                   <div className="battle-showcase-ring" />
                   <div className="battle-showcase-fighter battle-showcase-left">
                     <BattleFighter armed />
-                    <strong>DummyA</strong>
-                    <span>{lang === "en" ? "Melee pressure / Counter block" : "近战压制 / 格挡反击"}</span>
+                    <strong>{selectedLeft?.name ?? copy.leftCharacter}</strong>
+                    <span>{skillSummary(selectedLeft, copy)}</span>
                   </div>
                   <div className="battle-showcase-vs">VS</div>
                   <div className="battle-showcase-fighter battle-showcase-right">
                     <BattleFighter />
-                    <strong>DummyB</strong>
-                    <span>{lang === "en" ? "Ranged control / Dodge mobility" : "远程牵制 / 闪避机动"}</span>
+                    <strong>{selectedRight?.name ?? copy.rightCharacter}</strong>
+                    <span>{skillSummary(selectedRight, copy)}</span>
                   </div>
                 </div>
                 <div className="battle-showcase-text">
                   <h2>{copy.dataLoaded}</h2>
-                  <p>{copy.showcaseText}</p>
+                  <p>{copy.showcaseText(selectedArena?.name ?? copy.map)}</p>
                 </div>
                 <button className="battle-primary-button" type="button" onClick={startBattle}>
                   <span>♥</span>
@@ -508,14 +753,14 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
                 <div className="battle-hud-row">
                   <div className="battle-hud-card">
-                    <strong><span>♥</span> DummyA</strong>
-                    <div className="battle-stat"><span>HP</span><i><b style={{ width: `${(hpA / MAX_HP) * 100}%` }} /></i><em>{hpA} / {MAX_HP}</em></div>
-                    <div className="battle-stat"><span>MP</span><i><b className="battle-mp-fill" style={{ width: `${(mpA / MAX_MP) * 100}%` }} /></i><em>{mpA} / {MAX_MP}</em></div>
+                    <strong><span>♥</span> {selectedLeft?.name ?? copy.leftCharacter}</strong>
+                    <div className="battle-stat"><span>HP</span><i><b style={{ width: `${(hpA / maxHp) * 100}%` }} /></i><em>{hpA} / {maxHp}</em></div>
+                    <div className="battle-stat"><span>MP</span><i><b className="battle-mp-fill" style={{ width: `${(mpA / maxMp) * 100}%` }} /></i><em>{mpA} / {maxMp}</em></div>
                   </div>
                   <div className="battle-hud-card">
-                    <strong>DummyB</strong>
-                    <div className="battle-stat"><span>HP</span><i><b style={{ width: `${(hpB / MAX_HP) * 100}%` }} /></i><em>{hpB} / {MAX_HP}</em></div>
-                    <div className="battle-stat"><span>MP</span><i><b className="battle-mp-fill" style={{ width: `${(mpB / MAX_MP) * 100}%` }} /></i><em>{mpB} / {MAX_MP}</em></div>
+                    <strong>{selectedRight?.name ?? copy.rightCharacter}</strong>
+                    <div className="battle-stat"><span>HP</span><i><b style={{ width: `${(hpB / maxHp) * 100}%` }} /></i><em>{hpB} / {maxHp}</em></div>
+                    <div className="battle-stat"><span>MP</span><i><b className="battle-mp-fill" style={{ width: `${(mpB / maxMp) * 100}%` }} /></i><em>{mpB} / {maxMp}</em></div>
                   </div>
                 </div>
 
@@ -541,8 +786,8 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                       <BattleSkull />
                       <div>
                         <strong>{copy.roundTurn(turn.round, turn.turn)}</strong>
-                        <p>DummyA: {translateAction(turn.action_a, lang)}</p>
-                        <p>DummyB: {translateAction(turn.action_b, lang)}</p>
+                        <p>{selectedLeft?.name ?? "A"}: {translateAction(turn.action_a, lang)}</p>
+                        <p>{selectedRight?.name ?? "B"}: {translateAction(turn.action_b, lang)}</p>
                         {(turn.damage_to_a > 0 || turn.damage_to_b > 0) && (
                           <p className="battle-log-damage">
                             {turn.damage_to_a > 0 && `A -${turn.damage_to_a} `}

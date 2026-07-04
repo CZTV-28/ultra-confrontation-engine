@@ -1,5 +1,8 @@
 use crate::battle::{Action, BattleEngine};
 use crate::loader::Loader;
+use crate::models::arena::Arena;
+use crate::models::character::Character;
+use crate::models::rules::Rules;
 use crate::rules::RuleEngine;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -60,6 +63,15 @@ pub struct BattleCommandResult {
     pub loss_reason: String,
     pub replay_id: String,
     pub turns: Vec<TurnRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BattleConfig {
+    pub left_character_id: String,
+    pub right_character_id: String,
+    pub arena_id: String,
+    pub ruleset_id: String,
 }
 
 pub struct BattleSession {
@@ -236,18 +248,45 @@ fn save_replay(replay: &mut ReplayData) {
 }
 
 #[tauri::command]
-pub fn init_battle() -> Result<String, String> {
+pub fn list_characters() -> Result<Vec<Character>, String> {
     let loader = Loader::new();
-    let rules = RuleEngine::load("S1")?;
+    let mut characters = loader.load_characters()?;
+    characters.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
+    Ok(characters)
+}
 
-    let char_a = loader.load_character("test_char_a")?;
-    let char_b = loader.load_character("test_char_b")?;
-    let skill_melee_a = loader.load_skill("slash")?;
-    let skill_ranged_a = loader.load_skill("bolt")?;
-    let skill_block_a = loader.load_skill("basic_block")?;
-    let skill_melee_b = loader.load_skill("slash")?;
-    let skill_ranged_b = loader.load_skill("bolt")?;
-    let skill_block_b = loader.load_skill("basic_block")?;
+#[tauri::command]
+pub fn list_arenas() -> Result<Vec<Arena>, String> {
+    let loader = Loader::new();
+    let mut arenas = loader.load_arenas()?;
+    arenas.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
+    Ok(arenas)
+}
+
+#[tauri::command]
+pub fn list_rulesets() -> Result<Vec<Rules>, String> {
+    let loader = Loader::new();
+    let mut rulesets = loader.load_rulesets()?;
+    rulesets.sort_by(|a, b| a.season.cmp(&b.season));
+    Ok(rulesets)
+}
+
+#[tauri::command]
+pub fn init_battle(config: BattleConfig) -> Result<String, String> {
+    let loader = Loader::new();
+    let rules = RuleEngine::load(&config.ruleset_id)?;
+
+    let char_a = loader.load_character(&config.left_character_id)?;
+    let char_b = loader.load_character(&config.right_character_id)?;
+    let arena = loader.load_arena(&config.arena_id)?;
+    let skill_melee_a = loader.load_skill(&char_a.skills.melee)?;
+    let skill_ranged_a = loader.load_skill(&char_a.skills.ranged)?;
+    let skill_block_a = loader.load_skill(&char_a.skills.block)?;
+    let _skill_dodge_a = loader.load_skill(&char_a.skills.dodge)?;
+    let skill_melee_b = loader.load_skill(&char_b.skills.melee)?;
+    let skill_ranged_b = loader.load_skill(&char_b.skills.ranged)?;
+    let skill_block_b = loader.load_skill(&char_b.skills.block)?;
+    let _skill_dodge_b = loader.load_skill(&char_b.skills.dodge)?;
 
     let engine = BattleEngine::new(
         char_a.clone(),
@@ -258,6 +297,7 @@ pub fn init_battle() -> Result<String, String> {
         skill_melee_b,
         skill_ranged_b,
         skill_block_b,
+        arena,
         rules,
     );
 
@@ -496,4 +536,37 @@ pub fn import_replay(data: Vec<u8>) -> Result<ReplayData, String> {
     let mut validated = replay.clone();
     save_replay(&mut validated);
     Ok(replay)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configured_battle_can_start_from_listed_assets() {
+        let characters = list_characters().expect("characters should load");
+        let arenas = list_arenas().expect("arenas should load");
+        let rulesets = list_rulesets().expect("rulesets should load");
+
+        assert!(!characters.is_empty());
+        assert!(!arenas.is_empty());
+        assert!(!rulesets.is_empty());
+
+        let left = &characters[0];
+        let right = characters.get(1).unwrap_or(left);
+        let arena = &arenas[0];
+        let ruleset = &rulesets[0];
+
+        let session_id = init_battle(BattleConfig {
+            left_character_id: left.id.clone(),
+            right_character_id: right.id.clone(),
+            arena_id: arena.id.clone(),
+            ruleset_id: ruleset.season.clone(),
+        })
+        .expect("configured battle should start");
+
+        let turn = step_battle(session_id).expect("configured battle should step");
+        assert_eq!(turn.round, 1);
+        assert_eq!(turn.turn, 1);
+    }
 }

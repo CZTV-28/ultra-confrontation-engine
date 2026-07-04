@@ -1,3 +1,4 @@
+use crate::models::arena::Arena;
 use crate::models::character::Character;
 use crate::models::passive::{PassiveEffectType, PassiveSkill};
 use crate::models::skill::Skill;
@@ -78,6 +79,7 @@ pub struct BattleEngine {
     pub skill_melee_b: Skill,
     pub skill_ranged_b: Skill,
     pub skill_block_b: Skill,
+    pub arena: Arena,
     pub round: i32,
     pub turn: i32,
     pub max_rounds: i32,
@@ -95,13 +97,30 @@ impl BattleEngine {
         skill_melee_b: Skill,
         skill_ranged_b: Skill,
         skill_block_b: Skill,
+        arena: Arena,
         rules: RuleEngine,
     ) -> Self {
         let max_hp = rules.max_hp();
         let max_mp = rules.max_mp();
-        let arena_radius = rules.arena_radius();
+        let arena_radius = arena.radius;
         let max_rounds = rules.max_rounds();
         let max_turns = rules.max_turns_per_round();
+        let spawn_a = arena
+            .spawn_points
+            .get(0)
+            .map(|position| Position {
+                x: position.x,
+                y: position.y,
+            })
+            .unwrap_or(Position { x: -100.0, y: 0.0 });
+        let spawn_b = arena
+            .spawn_points
+            .get(1)
+            .map(|position| Position {
+                x: position.x,
+                y: position.y,
+            })
+            .unwrap_or(Position { x: 100.0, y: 0.0 });
 
         Self {
             fighter_a: FighterState {
@@ -109,7 +128,7 @@ impl BattleEngine {
                 mp: max_mp,
                 max_hp,
                 max_mp,
-                position: Position { x: -100.0, y: 0.0 },
+                position: spawn_a,
                 blocked: false,
                 dodged: false,
                 passive: None,
@@ -120,7 +139,7 @@ impl BattleEngine {
                 mp: max_mp,
                 max_hp,
                 max_mp,
-                position: Position { x: 100.0, y: 0.0 },
+                position: spawn_b,
                 blocked: false,
                 dodged: false,
                 passive: None,
@@ -135,6 +154,7 @@ impl BattleEngine {
             skill_melee_b,
             skill_ranged_b,
             skill_block_b,
+            arena,
             round: 1,
             turn: 1,
             max_rounds,
@@ -673,6 +693,7 @@ impl BattleEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::arena::{Arena, Position as ArenaPosition};
     use crate::models::character::{Character, CharacterSkills};
     use crate::models::rules::{
         ArenaConfig, BasicAttackConstraints, BlockConstraints, CharacterDefaults, DodgeConstraints,
@@ -793,6 +814,19 @@ mod tests {
         })
     }
 
+    fn arena() -> Arena {
+        Arena {
+            id: "circle_500".to_string(),
+            name: "Circle500".to_string(),
+            shape: "circle".to_string(),
+            radius: 250.0,
+            spawn_points: vec![
+                ArenaPosition { x: -100.0, y: 0.0 },
+                ArenaPosition { x: 100.0, y: 0.0 },
+            ],
+        }
+    }
+
     fn engine(max_rounds: i32, max_turns: i32) -> BattleEngine {
         BattleEngine::new(
             character("A"),
@@ -803,6 +837,7 @@ mod tests {
             melee_skill(),
             ranged_skill(),
             block_skill(),
+            arena(),
             rules(max_rounds, max_turns),
         )
     }

@@ -13,6 +13,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
+            battle_cmd::list_characters,
+            battle_cmd::list_arenas,
+            battle_cmd::list_rulesets,
             battle_cmd::init_battle,
             battle_cmd::step_battle,
             battle_cmd::finish_battle,
