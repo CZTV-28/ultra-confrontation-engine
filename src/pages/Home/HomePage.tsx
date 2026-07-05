@@ -2,6 +2,23 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import englishLogo from "../../assets/images/ucon-logo-en.png";
+import englishLogoBlueSpear from "../../assets/images/logo-parts/ucon-logo-en-blue-spear.png";
+import englishLogoFlame from "../../assets/images/logo-parts/ucon-logo-en-flame.png";
+import englishLogoRedBlade from "../../assets/images/logo-parts/ucon-logo-en-red-blade.png";
+import englishLogoRedSpear from "../../assets/images/logo-parts/ucon-logo-en-red-spear.png";
+import englishLogoSoul from "../../assets/images/logo-parts/ucon-logo-en-soul.png";
+import englishLogoText from "../../assets/images/logo-parts/ucon-logo-en-text.png";
+import englishLogoWhiteSlash from "../../assets/images/logo-parts/ucon-logo-en-white-slash.png";
+import englishLogoYellowCore from "../../assets/images/logo-parts/ucon-logo-en-yellow-core.png";
+import chineseLogo from "../../assets/images/ucon-logo-zh.png";
+import logoBlueSpear from "../../assets/images/logo-parts/logo-fragment-blue-spear.png";
+import logoFlame from "../../assets/images/logo-parts/logo-fragment-flame.png";
+import logoRedBlade from "../../assets/images/logo-parts/logo-fragment-red-blade.png";
+import logoRedSpear from "../../assets/images/logo-parts/logo-fragment-red-spear.png";
+import logoSmallCn from "../../assets/images/logo-parts/logo-fragment-small-cn.png";
+import logoSoul from "../../assets/images/logo-parts/logo-fragment-soul.png";
+import logoWhiteSlash from "../../assets/images/logo-parts/logo-fragment-white-slash.png";
+import logoYellowCore from "../../assets/images/logo-parts/logo-fragment-yellow-core.png";
 import "./HomePage.css";
 
 type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "settings";
@@ -126,6 +143,36 @@ function HomeSkull() {
         <rect x="40" y="44" width="4" height="6" fill="#050505" />
       </g>
     </svg>
+  );
+}
+
+function HomeLogoFragments() {
+  return (
+    <div className="home-logo-fragments" aria-hidden="true">
+      <img className="home-logo-fragment home-logo-fragment-white-slash" src={logoWhiteSlash} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-blue-spear" src={logoBlueSpear} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-red-spear" src={logoRedSpear} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-red-blade" src={logoRedBlade} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-soul" src={logoSoul} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-small-cn" src={logoSmallCn} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-yellow-core" src={logoYellowCore} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-flame" src={logoFlame} alt="" />
+    </div>
+  );
+}
+
+function HomeEnglishLogoFragments() {
+  return (
+    <div className="home-logo-fragments home-logo-fragments-en" aria-hidden="true">
+      <img className="home-logo-fragment home-logo-fragment-en-soul" src={englishLogoSoul} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-white-slash" src={englishLogoWhiteSlash} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-blue-spear" src={englishLogoBlueSpear} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-red-blade" src={englishLogoRedBlade} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-red-spear" src={englishLogoRedSpear} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-text" src={englishLogoText} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-yellow-core" src={englishLogoYellowCore} alt="" />
+      <img className="home-logo-fragment home-logo-fragment-en-flame" src={englishLogoFlame} alt="" />
+    </div>
   );
 }
 
@@ -415,14 +462,14 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
           <div className={`home-title-block ${isEnglish ? "home-title-block-en" : "home-title-block-zh"}`}>
             {isEnglish ? (
-              <img className="home-title-image" src={englishLogo} alt="Ultra Confrontation" />
+              <div className="home-logo-composition home-logo-composition-en">
+                <img className="home-title-image home-title-image-en" src={englishLogo} alt="Ultra Confrontation" />
+                <HomeEnglishLogoFragments />
+              </div>
             ) : (
-              <div className="home-title-zh" aria-label="超类史诗">
-                {"超类史诗".split("").map((char, index) => (
-                  <span key={char} style={{ animationDelay: `${index * 0.12}s` }}>
-                    {char}
-                  </span>
-                ))}
+              <div className="home-logo-composition home-logo-composition-zh">
+                <HomeLogoFragments />
+                <img className="home-title-image home-title-image-zh" src={chineseLogo} alt="超类史诗" />
               </div>
             )}
           </div>

@@ -6,6 +6,30 @@ The project uses SemVer-style versions during early development. While UCE is st
 
 ## [0.1.1] - 2026-07-05
 
+### Final Refresh - 2026-07-05
+
+#### 中文
+
+- 完成主界面中英文 LOGO 最终接入。
+- 中文 LOGO 与英文 LOGO 均使用完整底图加分层素材动效，并统一画布对齐，避免素材错位或图片丢失。
+- 将 `v0.1.1` 作为参赛者发行前的最终收尾版本。
+
+#### English
+
+- Finalized the Chinese and English homepage logo integration.
+- Both logos now use full base artwork plus aligned animated asset layers to prevent missing images or misaligned parts.
+- Marks `v0.1.1` as the final closing build before the participant release handoff.
+
+This section was translated with AI. Please forgive any errors.
+
+#### 日本語
+
+- ホーム画面の中国語版・英語版ロゴの最終統合を完了しました。
+- 両方のロゴで完全なベース画像と整列済みのアニメーション素材レイヤーを使用し、画像欠落や素材のずれを防ぐようにしました。
+- `v0.1.1` を参加者向け配布前の最終仕上げビルドとして位置づけます。
+
+この本文はAI翻訳を使用しています。誤りがある場合はご容赦ください。
+
 ### Release Refresh - 2026-07-05
 
 #### 中文
