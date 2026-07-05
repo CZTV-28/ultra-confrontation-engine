@@ -1,0 +1,23 @@
+# Ultra Confrontation Engine License
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
+Unless a file or directory states otherwise, the source code of Ultra
+Confrontation Engine is licensed under the GNU General Public License,
+version 3 or later.
+
+The full license text is published by the Free Software Foundation:
+
+https://www.gnu.org/licenses/gpl-3.0.html
+
+This license applies to source code only.
+
+Non-code assets, including but not limited to logos, character artwork,
+music, sound effects, story material, tournament data, submitted character
+packages, and official UCG game content, are not automatically licensed
+under the GPL. See `ASSETS_LICENSE.md` and `SUBMISSION_TERMS.md`.
+
+Exported games created by users with UCE are not automatically owned by UCE
+or UCG. Before official game export is stabilized, runtime licensing will be
+kept separate so creators can decide how to distribute and monetize their
+own game content.

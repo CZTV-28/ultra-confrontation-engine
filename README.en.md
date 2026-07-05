@@ -4,13 +4,43 @@ Current UCE engine version: `0.1.2`
 
 [中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
 
-Ultra Confrontation is an engineering project that I am developing based on Undertale fan creations and characters from fan games. It is intended for quick, entertaining AI battle simulations, and later it will be connected with the development of Undertale AU Mugen fighting games and other game design work. For that reason, the overall project is called Ultra Confrontation Game, abbreviated below as UC or UCG.
+## Project Introduction
 
-Ultra Confrontation Engine, abbreviated below as UCE, is the engine born from this project. It is designed for personal use by players who want to develop characters, design their own characters, perform neural-network training and simulations, create their own AI characters, and lay the foundation for later game progression systems and simulated online tournaments.
+Ultra Confrontation is an integrated development project designed around the growth of Undertale fangames. I currently divide it into two parts:
 
-Based on the current design, UC Season 1: Origin has already started during the UCE engine development stage. This season is not yet open to fan creators from communities in every language. At the moment, it is only being used for pilot development and tournament simulations in the Chinese-speaking community.
+First, Ultra Confrontation Game, abbreviated as UCG. It includes card games, simulated tournament battles, MOBA-style content, omnidirectional Mugen fighting, PVP, PVE, and more categories beyond those listed here.
 
-If you are interested in this project, or if you believe it may have broad potential in the future, you are welcome to offer suggestions to help me improve its content.
+Second, Ultra Confrontation Engine, abbreviated as UCE. UCE exists to support all of the above content.
+
+The engine itself is intended to expand the diversity of fangames. Fan works do not have to stay limited to RPG or SRPG formats; they can also be developed in many other directions.
+
+With help from participants and many friends, UCE has already completed broad adaptation for AI simulated battle tournaments. The current development focus will mainly polish this module, and AI training is planned for implementation in `v0.3.0`. Based on a PPO neural-network simulation algorithm, users of the engine will be able to create AI agents unique to their own AUs, or AI data unit sets for UCG competitions.
+
+## Game Expansion Directions
+
+For game expansion, I have already reserved interfaces and framework foundations for several game types.
+
+- Card games: a development framework has already been reserved for a card-kill style game, which can be developed later in parallel.
+- Fighting games: some Mugen engine functions have been integrated, but they are not adapted yet.
+- MOBA: a template has been made for now, but planning comes first, so this will wait.
+- PVP / PVE: the exact type is undecided, but extra designs exist for tournament needs and future manual play.
+- Online mode: after UCE is upgraded to `v0.7.0`, P2P and LAN online play will be opened. Players will be able to create local rooms and share their network with players who join. Server-based online features may take longer to develop.
+
+Based on the current design, UC Season 1: Origin has already started during the UCE engine development stage. This season is not yet open to fan creators from all language communities. For now, it is only being used for pilot development and tournament simulations in the Chinese-speaking community.
+
+That said, this project was still born from my own empty fantasy about fan creation. In truth, I got numb from writing songs, so I started building a project for fun.
+
+This program is built with the Rust ecosystem and uses the GPL open-source license. Anyone interested can download and use it.
+
+All right, I wish you a pleasant life, and I hope our future fan creations have no limits.
+
+## License Boundaries
+
+- UCE source code is licensed under `GPL-3.0-or-later`.
+- Logos, artwork, music, character settings, tournament data, official UCG game content, and in-app purchase content are not automatically licensed under the GPL. See [ASSETS_LICENSE.md](ASSETS_LICENSE.md).
+- Participant `.ucechar` submissions, artwork, skill designs, and passive designs follow [SUBMISSION_TERMS.md](SUBMISSION_TERMS.md).
+- Game content created and exported by creators with UCE should generally be distributed and monetized at the creator's own discretion. The official export Runtime will be split into a separate license later.
+- See [docs/licensing.md](docs/licensing.md) for the detailed licensing structure.
 
 ## Tech Stack
 
@@ -48,7 +78,7 @@ Check whether game data is synchronized:
 npm run check:assets
 ```
 
-Run the web frontend:
+Run the Web frontend:
 
 ```powershell
 npm run dev
@@ -73,4 +103,4 @@ cd src-tauri
 cargo check
 ```
 
-Translation note: 此段对话使用AI进行翻译，如有错误还请谅解
+This README was translated with AI. Please forgive any errors.
