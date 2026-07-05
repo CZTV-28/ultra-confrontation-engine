@@ -1,6 +1,6 @@
 # Ultra Confrontation - 超类史诗
 
-現在の UCE エンジンバージョン：`0.1.1`
+現在の UCE エンジンバージョン：`0.1.2`
 
 [中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
 
