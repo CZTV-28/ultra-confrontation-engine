@@ -616,19 +616,6 @@ fn validate_character_passive(character: &Character, report: &mut AssetValidatio
                     character.id
                 ));
             }
-            if passive
-                .effect
-                .balance_notes
-                .as_deref()
-                .unwrap_or("")
-                .trim()
-                .is_empty()
-            {
-                report.error(format!(
-                    "Character {} custom passive must include balance_notes for review.",
-                    character.id
-                ));
-            }
         }
     }
 }

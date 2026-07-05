@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
+import { normalizePortraitDataUrl } from "../../utils/portraitImage";
 import "./CreatorPage.css";
 
 interface CreatorPageProps {
@@ -60,7 +61,6 @@ interface PassiveDraft {
   value: string;
   valueUnit: string;
   effectDescription: string;
-  balanceNotes: string;
   description: string;
 }
 
@@ -81,8 +81,8 @@ const basicDamageTable: Record<number, number> = {
   30: 40,
 };
 
-const UCE_VERSION = "0.1.1";
-const CHARACTER_SCHEMA_VERSION = "0.1.1";
+const UCE_VERSION = "0.1.2";
+const CHARACTER_SCHEMA_VERSION = "0.1.2";
 const S1_RULESET_VERSION = "0.1.0";
 
 const copy = {
@@ -97,6 +97,7 @@ const copy = {
     exportFailed: "导出失败，请在 Tauri 桌面端运行并确认文件权限。",
     fixIssues: "需要先修正红色校验项。",
     id: "资源 ID",
+    projectName: "项目名称",
     name: "角色名",
     creator: "作者",
     hp: "生命",
@@ -107,6 +108,7 @@ const copy = {
     clearPortrait: "清除立绘",
     portraitEmpty: "未上传",
     portraitFormat: "PNG / JPG / WEBP",
+    portraitGuide: "建议使用 3:4 竖版立绘，例如 900x1200 或 1200x1600；上传后会等比例缩放完整显示，不会裁切画面。",
     notes: "AI 训练备注",
     skillName: "技能名",
     mpCost: "耗蓝",
@@ -143,7 +145,6 @@ const copy = {
     passiveValue: "数值（可选）",
     valueUnit: "数值单位",
     passiveEffectDescription: "单一效果说明",
-    balanceNotes: "平衡审核说明",
     passiveDescription: "被动介绍",
     packageLabel: "参赛文件",
     characterLabel: "角色 JSON",
@@ -166,6 +167,7 @@ const copy = {
     exportFailed: "Export failed. Run inside the Tauri desktop app and check file permissions.",
     fixIssues: "Fix red validation items before exporting.",
     id: "Resource ID",
+    projectName: "Project Name",
     name: "Name",
     creator: "Creator",
     hp: "HP",
@@ -176,6 +178,7 @@ const copy = {
     clearPortrait: "Clear Portrait",
     portraitEmpty: "Not Uploaded",
     portraitFormat: "PNG / JPG / WEBP",
+    portraitGuide: "Recommended 3:4 vertical portrait, e.g. 900x1200 or 1200x1600. The full image is scaled proportionally without cropping.",
     notes: "AI Training Notes",
     skillName: "Skill Name",
     mpCost: "MP Cost",
@@ -212,7 +215,6 @@ const copy = {
     passiveValue: "Value (Optional)",
     valueUnit: "Value Unit",
     passiveEffectDescription: "Single Effect Description",
-    balanceNotes: "Balance Review Notes",
     passiveDescription: "Passive Intro",
     packageLabel: "Submission Package",
     characterLabel: "Character JSON",
@@ -342,7 +344,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   const lang: Language = i18n.language.startsWith("en") ? "en" : "zh";
   const t = copy[lang];
 
-  const [characterId, setCharacterId] = useState("origin_fighter");
+  const [projectName, setProjectName] = useState(lang === "en" ? "Origin Project" : "起源项目");
   const [characterName, setCharacterName] = useState(lang === "en" ? "Origin Fighter" : "起源斗士");
   const [creator, setCreator] = useState("creator_name");
   const [description, setDescription] = useState(
@@ -403,12 +405,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     value: "",
     valueUnit: "",
     effectDescription: "",
-    balanceNotes: "",
     description: "",
   });
   const [status, setStatus] = useState("");
 
-  const resourceId = normalizeId(characterId);
+  const resourceId = normalizeId(`${projectName}_${characterName}`);
   const rangedCost = rangedMpCost(ranged);
   const blockCost = blockMpCost(block);
   const dodgeCost = dodgeMpCost(dodge);
@@ -431,7 +432,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         trigger_condition: passive.triggerCondition.trim() || null,
         value: passive.value.trim() ? Number(passive.value) : null,
         value_unit: passive.valueUnit.trim() || null,
-        balance_notes: passive.balanceNotes.trim(),
       },
       official_review_required: true,
       description: passive.description.trim(),
@@ -441,6 +441,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   const characterResource = useMemo(
     () => ({
       id: resourceId,
+      project_name: projectName.trim(),
       name: characterName.trim(),
       creator: creator.trim(),
       description: description.trim(),
@@ -475,6 +476,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       portrait.dataUrl,
       portrait.fileName,
       portrait.mimeType,
+      projectName,
       ranged.id,
       resourceId,
     ],
@@ -656,8 +658,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     const ids = [resourceId, ...skillIds, ...(passiveId ? [passiveId] : [])];
     const uniqueIds = new Set(ids);
 
+    if (projectName.trim().length === 0) {
+      issues.push(lang === "en" ? "Project name cannot be empty." : "项目名称不能为空。");
+    }
     if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(resourceId)) {
-      issues.push(lang === "en" ? "Character ID must be 3-64 file-safe characters." : "角色 ID 需要是 3-64 位文件安全字符。");
+      issues.push(lang === "en" ? "Generated character ID must be 3-64 file-safe characters." : "自动生成的角色 ID 需要是 3-64 位文件安全字符。");
     }
     if (characterResource.name.length === 0) {
       issues.push(lang === "en" ? "Character name cannot be empty." : "角色名不能为空。");
@@ -695,9 +700,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       }
       if (passive.effectDescription.trim().length === 0) {
         issues.push(lang === "en" ? "Passive single effect description cannot be empty." : "被动单一效果说明不能为空。");
-      }
-      if (passive.balanceNotes.trim().length === 0) {
-        issues.push(lang === "en" ? "Passive balance review notes cannot be empty." : "被动平衡审核说明不能为空。");
       }
       if (passive.value.trim().length > 0 && !Number.isFinite(Number(passive.value))) {
         issues.push(lang === "en" ? "Passive value must be numeric when provided." : "被动数值如果填写，必须是数字。");
@@ -753,7 +755,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     }
 
     return issues;
-  }, [basic, block, characterResource, dodge, hp, lang, melee, mp, passive, ranged, resourceId]);
+  }, [basic, block, characterResource, dodge, hp, lang, melee, mp, passive, projectName, ranged, resourceId]);
 
   const previewPackage = useMemo(
     () => ({
@@ -801,10 +803,12 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       const fileName = fileNameFromPath(selectedPath);
       const mimeType = mimeTypeFromFileName(fileName);
       const bytes = await readFile(selectedPath);
+      const originalDataUrl = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+      const dataUrl = await normalizePortraitDataUrl(originalDataUrl, mimeType);
       setPortrait({
         fileName,
         mimeType,
-        dataUrl: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
+        dataUrl,
       });
     } catch (error) {
       console.error(error);
@@ -1158,14 +1162,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
                   />
                 </label>
                 <label className="creator-wide-grid-field">
-                  <span>{t.balanceNotes}</span>
-                  <textarea
-                    value={passive.balanceNotes}
-                    onChange={(e) => setPassive((current) => ({ ...current, balanceNotes: e.target.value }))}
-                    rows={3}
-                  />
-                </label>
-                <label className="creator-wide-grid-field">
                   <span>{t.passiveDescription}</span>
                   <textarea
                     value={passive.description}
@@ -1269,8 +1265,8 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <div className="creator-section-title">{t.identity}</div>
               <div className="creator-grid">
                 <label>
-                  <span>{t.id}</span>
-                  <input value={characterId} onChange={(e) => setCharacterId(e.target.value)} />
+                  <span>{t.projectName}</span>
+                  <input value={projectName} onChange={(e) => setProjectName(e.target.value)} />
                 </label>
                 <label>
                   <span>{t.name}</span>
@@ -1312,6 +1308,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
                 <div className="creator-portrait-meta">
                   <span>{t.portrait}</span>
                   <strong>{portrait.fileName || t.portraitFormat}</strong>
+                  <p className="creator-portrait-guide">{t.portraitGuide}</p>
                   <div className="creator-portrait-actions">
                     <button type="button" onClick={uploadPortrait}>{t.uploadPortrait}</button>
                     <button

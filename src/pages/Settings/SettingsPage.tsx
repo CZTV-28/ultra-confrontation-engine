@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
-import UCPanel from "../../components/common/UCPanel/UCPanel";
-import UCButton from "../../components/common/UCButton/UCButton";
 import { useSettingsStore } from "../../store/settingsStore";
 import "./SettingsPage.css";
 
@@ -10,16 +8,74 @@ interface SettingsPageProps {
   goBack: () => void;
 }
 
+const copy = {
+  zh: {
+    eyebrow: "系统配置",
+    title: "设置",
+    back: "返回",
+    language: "语言",
+    languageDesc: "切换主界面与功能页面的显示语言。",
+    languageButton: "中文 / English",
+    speed: "模拟倍速",
+    speedDesc: "0 代表立刻完成本轮模拟，并保留完整日志。",
+    instant: "立即完成",
+    volume: "音量",
+    volumeDesc: "预留给后续主界面配乐和战斗音效。",
+    keys: "按键指南",
+    keyRows: [
+      ["↑↓ / WS", "选择"],
+      ["←→ / AD", "调整"],
+      ["Z / Enter", "确认"],
+      ["X / Esc", "返回"],
+      ["I", "导入"],
+      ["E", "导出"],
+      ["D", "删除"],
+      ["Space", "播放 / 暂停"],
+    ],
+  },
+  en: {
+    eyebrow: "System Config",
+    title: "Settings",
+    back: "Back",
+    language: "Language",
+    languageDesc: "Switch the display language used by the home screen and feature pages.",
+    languageButton: "English / 中文",
+    speed: "Simulation Speed",
+    speedDesc: "0 resolves the current simulation instantly while keeping the complete log.",
+    instant: "Instant",
+    volume: "Volume",
+    volumeDesc: "Reserved for future home music and battle sound effects.",
+    keys: "Key Guide",
+    keyRows: [
+      ["↑↓ / WS", "Select"],
+      ["←→ / AD", "Adjust"],
+      ["Z / Enter", "Confirm"],
+      ["X / Esc", "Back"],
+      ["I", "Import"],
+      ["E", "Export"],
+      ["D", "Delete"],
+      ["Space", "Play / Pause"],
+    ],
+  },
+};
+
+function speedLabel(speed: number, instantLabel: string) {
+  if (speed === 0) {
+    return instantLabel;
+  }
+  return `${speed.toFixed(2).replace(/\.00$/, "").replace(/0$/, "")}x`;
+}
+
 export default function SettingsPage({ goBack }: SettingsPageProps) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const { battleSpeed, volume, setBattleSpeed, setVolume } = useSettingsStore();
   const lang = i18n.language.startsWith("en") ? "en" : "zh";
-  const isEnglish = lang === "en";
+  const t = copy[lang];
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "x" || e.key === "X") {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "x" || event.key === "X" || event.key === "Escape") {
+        event.preventDefault();
         goBack();
       }
     };
@@ -29,84 +85,102 @@ export default function SettingsPage({ goBack }: SettingsPageProps) {
   }, [goBack]);
 
   const toggleLanguage = () => {
-    const nextLang = isEnglish ? "zh" : "en";
+    const nextLang = lang === "en" ? "zh" : "en";
     i18n.changeLanguage(nextLang);
     window.localStorage.setItem("uce_language", nextLang);
   };
 
-  const speedLabel =
-    battleSpeed === 0
-      ? isEnglish
-        ? "Instant"
-        : "立即完成"
-      : `${battleSpeed.toFixed(2).replace(/\.00$/, "").replace(/0$/, "")}x`;
-
   return (
     <UCWindow>
-      <UCPanel width="800px" padding="50px">
-        <h1 className="settings-title">{t("settings")}</h1>
+      <main className="settings-shell">
+        <header className="settings-header">
+          <div>
+            <span>{t.eyebrow}</span>
+            <h1>{t.title}</h1>
+          </div>
+          <button type="button" onClick={goBack}>
+            X / {t.back}
+          </button>
+        </header>
 
-        <div className="settings-section">
-          <div className="settings-label">
-            {isEnglish ? "Language" : "语言 / Language"}
-          </div>
-          <UCButton
-            text={isEnglish ? "English → 中文" : "中文 → English"}
-            onClick={toggleLanguage}
-          />
-        </div>
+        <section className="settings-board">
+          <article className="settings-card settings-card-language">
+            <div className="settings-card-copy">
+              <span>01</span>
+              <h2>{t.language}</h2>
+              <p>{t.languageDesc}</p>
+            </div>
+            <button className="settings-language-button" type="button" onClick={toggleLanguage}>
+              {t.languageButton}
+            </button>
+          </article>
 
-        <div className="settings-section">
-          <div className="settings-label">
-            {isEnglish ? "Simulation Speed" : "模拟倍速"}: {speedLabel}
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="3"
-            step="0.25"
-            value={battleSpeed}
-            onChange={(e) => setBattleSpeed(Number(e.target.value))}
-            className="settings-slider"
-          />
-          <div className="settings-slider-scale">
-            <span>0</span>
-            <span>1x</span>
-            <span>2x</span>
-            <span>3x</span>
-          </div>
-        </div>
+          <article className="settings-card">
+            <div className="settings-card-copy">
+              <span>02</span>
+              <h2>{t.speed}</h2>
+              <p>{t.speedDesc}</p>
+            </div>
+            <div className="settings-control">
+              <div className="settings-value">{speedLabel(battleSpeed, t.instant)}</div>
+              <input
+                type="range"
+                min="0"
+                max="3"
+                step="0.25"
+                value={battleSpeed}
+                onChange={(event) => setBattleSpeed(Number(event.target.value))}
+                className="settings-slider"
+              />
+              <div className="settings-slider-scale">
+                <span>0</span>
+                <span>1x</span>
+                <span>2x</span>
+                <span>3x</span>
+              </div>
+            </div>
+          </article>
 
-        <div className="settings-section">
-          <div className="settings-label">
-            {isEnglish ? "Volume" : "音量"}: {volume}%
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            className="settings-slider"
-          />
-        </div>
+          <article className="settings-card">
+            <div className="settings-card-copy">
+              <span>03</span>
+              <h2>{t.volume}</h2>
+              <p>{t.volumeDesc}</p>
+            </div>
+            <div className="settings-control">
+              <div className="settings-value">{volume}%</div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(event) => setVolume(Number(event.target.value))}
+                className="settings-slider"
+              />
+              <div className="settings-slider-scale">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+              </div>
+            </div>
+          </article>
 
-        <div className="settings-guide">
-          <div className="settings-guide-title">
-            {isEnglish ? "Key Guide" : "按键指南"}
-          </div>
-          <div className="settings-guide-grid">
-            <span><span className="guide-key">↑↓/WS</span> {isEnglish ? "Select" : "选择"}</span>
-            <span><span className="guide-key">←→/AD</span> {isEnglish ? "Adjust" : "调整"}</span>
-            <span><span className="guide-key">Z/Enter</span> {isEnglish ? "Confirm" : "确认"}</span>
-            <span><span className="guide-key">X</span> {isEnglish ? "Back" : "返回"}</span>
-            <span><span className="guide-key">E</span> {isEnglish ? "Export" : "导出"}</span>
-            <span><span className="guide-key">I</span> {isEnglish ? "Import" : "导入"}</span>
-            <span><span className="guide-key">D</span> {isEnglish ? "Delete" : "删除"}</span>
-            <span><span className="guide-key">Space</span> {isEnglish ? "Play/Pause" : "播放/暂停"}</span>
-          </div>
-        </div>
-      </UCPanel>
+          <article className="settings-card settings-card-keys">
+            <div className="settings-card-copy">
+              <span>04</span>
+              <h2>{t.keys}</h2>
+            </div>
+            <div className="settings-key-grid">
+              {t.keyRows.map(([keyName, action]) => (
+                <div className="settings-key-row" key={keyName}>
+                  <kbd>{keyName}</kbd>
+                  <span>{action}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+      </main>
     </UCWindow>
   );
 }

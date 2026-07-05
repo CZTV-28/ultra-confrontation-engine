@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import { useSettingsStore } from "../../store/settingsStore";
+import { decodeImageDataUrl } from "../../utils/portraitImage";
 import "./BattlePage.css";
 
 interface BattlePageProps {
@@ -54,6 +55,7 @@ interface CharacterPortrait {
 
 interface CharacterResource {
   id: string;
+  project_name?: string | null;
   name: string;
   creator: string;
   description?: string | null;
@@ -114,7 +116,6 @@ type PassiveResource = {
     trigger_condition?: string | null;
     value?: number | null;
     value_unit?: string | null;
-    balance_notes?: string | null;
   };
 };
 
@@ -170,6 +171,7 @@ const battleCopy = {
     assetLoading: "正在读取本地资源库...",
     assetLoadError: "无法读取角色、地图或规则资源，请在桌面应用中运行。",
     noResource: "暂无可用资源",
+    project: "项目",
     creator: "作者",
     hpLabel: "生命",
     mpLabel: "能量",
@@ -233,6 +235,7 @@ const battleCopy = {
     assetLoading: "Reading local asset library...",
     assetLoadError: "Cannot read characters, arenas, or rulesets. Run this in the desktop app.",
     noResource: "No available resources",
+    project: "Project",
     creator: "Creator",
     hpLabel: "HP",
     mpLabel: "MP",
@@ -401,11 +404,18 @@ function CharacterPortraitView({
   armed?: boolean;
 }) {
   const dataUrl = character?.portrait?.data_url;
+  const hasPortrait = Boolean(character?.portrait);
 
   return (
-    <div className={`battle-portrait-view ${dataUrl ? "battle-portrait-view-image" : ""}`}>
+    <div
+      className={`battle-portrait-view ${dataUrl ? "battle-portrait-view-image" : ""} ${
+        hasPortrait && !dataUrl ? "battle-portrait-view-loading" : ""
+      }`}
+    >
       {dataUrl ? (
         <img src={dataUrl} alt={character?.name ?? "character"} />
+      ) : hasPortrait ? (
+        <span className="battle-portrait-loading-mark" />
       ) : (
         <BattleFighter armed={armed} />
       )}
@@ -436,6 +446,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const [flash, setFlash] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [characters, setCharacters] = useState<CharacterResource[]>([]);
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, CharacterPortrait | null>>({});
   const [arenas, setArenas] = useState<ArenaResource[]>([]);
   const [rulesets, setRulesets] = useState<RulesetResource[]>([]);
   const [skills, setSkills] = useState<SkillResource[]>([]);
@@ -453,19 +464,27 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   const skillById = useMemo(() => new Map(skills.map((skill) => [skill.id, skill])), [skills]);
-  const selectedLeft = characters.find((character) => character.id === selectedLeftId);
-  const selectedRight = characters.find((character) => character.id === selectedRightId);
+  const charactersWithPortraits = useMemo(
+    () =>
+      characters.map((character) => ({
+        ...character,
+        portrait: characterPortraits[character.id] ?? character.portrait ?? null,
+      })),
+    [characterPortraits, characters],
+  );
+  const selectedLeft = charactersWithPortraits.find((character) => character.id === selectedLeftId);
+  const selectedRight = charactersWithPortraits.find((character) => character.id === selectedRightId);
   const selectedArena = arenas.find((arena) => arena.id === selectedArenaId);
   const selectedRuleset = rulesets.find((ruleset) => ruleset.season === selectedRulesetId);
-  const focusedCharacter = characters[focusedCharacterIndex];
+  const focusedCharacter = charactersWithPortraits[focusedCharacterIndex];
   const focusedArena = arenas[focusedArenaIndex];
   const characterSlots = useMemo(
     () =>
       Array.from({ length: Math.max(CHARACTER_LIBRARY_SLOTS, characters.length) }, (_, index) => ({
-        character: characters[index],
+        character: charactersWithPortraits[index],
         slot: index + 1,
       })),
-    [characters],
+    [charactersWithPortraits],
   );
   const arenaSlots = useMemo(
     () =>
@@ -588,6 +607,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
       setAssetsLoadFailed(false);
 
       try {
+        setCharacterPortraits({});
         const [loadedCharacters, loadedArenas, loadedRulesets, loadedSkills] = await Promise.all([
           invoke<CharacterResource[]>("list_characters"),
           invoke<ArenaResource[]>("list_arenas"),
@@ -634,6 +654,54 @@ export default function BattlePage({ goBack }: BattlePageProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = 0;
+
+    const loadPortraits = async () => {
+      for (const character of characters) {
+        if (cancelled) {
+          return;
+        }
+
+        try {
+          const portrait = await invoke<CharacterPortrait | null>("get_character_portrait", { characterId: character.id });
+          if (portrait?.data_url) {
+            await decodeImageDataUrl(portrait.data_url);
+          }
+          if (!cancelled) {
+            setCharacterPortraits((current) =>
+              Object.prototype.hasOwnProperty.call(current, character.id)
+                ? current
+                : { ...current, [character.id]: portrait },
+            );
+          }
+        } catch {
+          if (!cancelled) {
+            setCharacterPortraits((current) =>
+              Object.prototype.hasOwnProperty.call(current, character.id)
+                ? current
+                : { ...current, [character.id]: null },
+            );
+          }
+        }
+
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 16);
+        });
+      }
+    };
+
+    if (characters.length > 0) {
+      timer = window.setTimeout(loadPortraits, 80);
+    }
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [characters]);
 
   const startBattle = async () => {
     if (!canConfirmSelection) {
@@ -888,7 +956,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
             <h1>{copy.title}</h1>
             <span>{phaseTitle}</span>
           </div>
-          <div className="battle-version">UCE v0.1.1</div>
+          <div className="battle-version">UCE v0.1.2</div>
         </header>
 
         <main className={`battle-grid battle-grid-${phase}`}>
@@ -1018,6 +1086,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
                       </div>
                       <h2>{focusedCharacter.name}</h2>
                       <div className="battle-detail-stats">
+                        {focusedCharacter.project_name && <span>{copy.project}: {focusedCharacter.project_name}</span>}
                         <span>{copy.creator}: {focusedCharacter.creator}</span>
                         <span>{copy.hpLabel}: {focusedCharacter.hp}</span>
                         <span>{copy.mpLabel}: {focusedCharacter.mp}</span>

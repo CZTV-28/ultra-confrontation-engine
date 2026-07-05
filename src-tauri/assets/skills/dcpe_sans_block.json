@@ -1,0 +1,8 @@
+{
+  "damage_reduction": 0.52,
+  "id": "dcpe_sans_block",
+  "max_damage_reduction": 0.75,
+  "mp_cost": 0,
+  "name": "悖时反衡",
+  "type": "block"
+}

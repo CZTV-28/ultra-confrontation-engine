@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
+import { normalizePortraitDataUrl } from "../../utils/portraitImage";
 import {
   S1_ROSTER_SIZE,
   findS1RosterSlot,
@@ -35,6 +36,7 @@ interface ChecksumStatus {
 
 interface CharacterResource {
   id?: unknown;
+  project_name?: unknown;
   name?: unknown;
   creator?: unknown;
   description?: unknown;
@@ -419,10 +421,10 @@ function reviewSubmission(submission: SubmissionPackage, checksum: ChecksumStatu
     error("角色 ID", "角色 ID 不能为空，且只能包含小写字母、数字、下划线或连字符。");
   }
 
-  if (hasText(character.name) && hasText(character.creator)) {
-    pass("角色署名", "角色名称与作者字段已填写。");
+  if (hasText(character.project_name) && hasText(character.name) && hasText(character.creator)) {
+    pass("角色署名", "项目名称、角色名称与作者字段已填写。");
   } else {
-    error("角色署名", "角色名称和作者不能为空。");
+    error("角色署名", "项目名称、角色名称和作者不能为空。");
   }
 
   if (asNumber(character.hp) === 500 && asNumber(character.mp) === 250) {
@@ -587,10 +589,10 @@ function reviewSubmission(submission: SubmissionPackage, checksum: ChecksumStatu
       error("被动审核标记", "被动必须设置 official_review_required: true。");
     }
     const effect = passive.effect;
-    if (isRecord(effect) && hasText(effect.category) && hasText(effect.name) && hasText(effect.description) && hasText(effect.balance_notes)) {
+    if (isRecord(effect) && hasText(effect.category) && hasText(effect.name) && hasText(effect.description)) {
       pass("被动效果说明", "被动效果核心字段已填写。");
     } else {
-      error("被动效果说明", "被动 effect 必须填写 category、name、description、balance_notes。");
+      error("被动效果说明", "被动 effect 必须填写 category、name、description。");
     }
   } else {
     pass("自定义被动", "该角色未启用被动。");
@@ -672,6 +674,59 @@ function buildOfficialBundle(
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
+}
+
+function redactPreviewValue(value: unknown, key = ""): unknown {
+  if (typeof value === "string") {
+    if (key === "data_url" || key === "dataUrl" || key === "base64") {
+      return `[omitted embedded asset data: ${value.length} chars]`;
+    }
+
+    if (value.length > 600) {
+      return `${value.slice(0, 240)}... [omitted ${value.length - 240} chars]`;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactPreviewValue(item));
+  }
+
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [entryKey, redactPreviewValue(entryValue, entryKey)]),
+    );
+  }
+
+  return value;
+}
+
+function formatPreviewJson(value: unknown) {
+  return formatJson(redactPreviewValue(value));
+}
+
+async function normalizeSubmissionPortrait(submission: SubmissionPackage): Promise<SubmissionPackage> {
+  const portrait = isRecord(submission.character?.portrait) ? submission.character.portrait : null;
+  const dataUrl = asString(portrait?.data_url);
+  if (!portrait || !dataUrl) {
+    return submission;
+  }
+
+  const mimeType = asString(portrait.mime_type, "image/png");
+  const normalizedDataUrl = await normalizePortraitDataUrl(dataUrl, mimeType);
+  if (normalizedDataUrl === dataUrl) {
+    return submission;
+  }
+
+  return {
+    ...submission,
+    character: {
+      ...submission.character,
+      portrait: {
+        ...portrait,
+        data_url: normalizedDataUrl,
+      },
+    },
+  };
 }
 
 function getSuggestedRosterSlot(roster: S1RosterSlot[], characterId: string) {
@@ -798,11 +853,12 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       const nextSubmission = parsed as SubmissionPackage;
       const nextChecksum = await verifyChecksum(nextSubmission);
       const nextItems = reviewSubmission(nextSubmission, nextChecksum);
+      const normalizedSubmission = await normalizeSubmissionPortrait(nextSubmission);
       const nextRoster = readS1Roster();
       const nextCharacterId = asString(nextSubmission.character?.id);
       const existingSlot = findS1RosterSlot(nextRoster, nextCharacterId);
 
-      setSubmission(nextSubmission);
+      setSubmission(normalizedSubmission);
       setSourcePath(selectedPath);
       setChecksum(nextChecksum);
       setItems(nextItems);
@@ -970,6 +1026,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
             <h3>{t.character}</h3>
             <dl className="review-meta">
               <div><dt>ID</dt><dd>{asString(officialPackageCharacter?.id, "-")}</dd></div>
+              <div><dt>Project</dt><dd>{asString(officialPackageCharacter?.project_name, "-")}</dd></div>
               <div><dt>Name</dt><dd>{asString(officialPackageCharacter?.name, "-")}</dd></div>
               <div><dt>Creator</dt><dd>{asString(officialPackageCharacter?.creator, "-")}</dd></div>
               <div><dt>HP / MP</dt><dd>{String(asNumber(officialPackageCharacter?.hp) ?? "-")} / {String(asNumber(officialPackageCharacter?.mp) ?? "-")}</dd></div>
@@ -1138,6 +1195,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
                   <h2>{t.character}</h2>
                   <dl className="review-meta">
                     <div><dt>ID</dt><dd>{asString(character?.id, "-")}</dd></div>
+                    <div><dt>Project</dt><dd>{asString(character?.project_name, "-")}</dd></div>
                     <div><dt>Name</dt><dd>{asString(character?.name, "-")}</dd></div>
                     <div><dt>Creator</dt><dd>{asString(character?.creator, "-")}</dd></div>
                     <div><dt>HP / MP</dt><dd>{String(asNumber(character?.hp) ?? "-")} / {String(asNumber(character?.mp) ?? "-")}</dd></div>
@@ -1168,7 +1226,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
 
               <section className="review-panel">
                 <h2>{t.passive}</h2>
-                <pre>{passive ? formatJson(passive) : t.empty}</pre>
+                <pre>{passive ? formatPreviewJson(passive) : t.empty}</pre>
               </section>
 
               <section className="review-panel">
@@ -1178,7 +1236,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
 
               <section className="review-panel review-preview">
                 <h2>{t.officialPreview}</h2>
-                <pre>{officialBundle ? formatJson(officialBundle.official_assets) : t.empty}</pre>
+                <pre>{officialBundle ? formatPreviewJson(officialBundle.official_assets) : t.empty}</pre>
               </section>
 
               {renderOfficialImportPanel()}

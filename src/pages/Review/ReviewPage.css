@@ -111,19 +111,22 @@
   display: grid;
   grid-template-columns: minmax(330px, 0.85fr) minmax(0, 1.45fr);
   gap: 14px;
+  overflow: hidden;
 }
 
 .review-left,
 .review-right {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .review-right {
-  overflow: auto;
-  padding-right: 4px;
+  scroll-padding-bottom: 16px;
 }
 
 .review-panel,
@@ -136,7 +139,9 @@
 }
 
 .review-panel {
+  flex: 0 0 auto;
   min-height: 0;
+  min-width: 0;
   padding: 16px;
   box-sizing: border-box;
 }
@@ -353,11 +358,12 @@
   color: rgba(255, 255, 255, 0.72);
   font-size: 14px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .review-skill-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
 }
 
@@ -373,7 +379,6 @@
   background: rgba(255, 255, 255, 0.045);
 }
 
-.review-skill strong,
 .review-skill span,
 .review-skill em {
   min-width: 0;
@@ -383,7 +388,10 @@
 }
 
 .review-skill strong {
+  min-width: 0;
   font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .review-skill span {
@@ -399,7 +407,7 @@
 }
 
 .review-panel pre {
-  max-height: 160px;
+  max-height: 220px;
   margin: 0;
   overflow: auto;
   padding: 12px;
@@ -409,16 +417,19 @@
   font-family: "Courier New", monospace;
   font-size: 12px;
   line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-preview {
-  min-height: 220px;
+  min-height: 260px;
+  max-height: 420px;
   overflow: hidden;
 }
 
 .review-preview pre {
-  height: calc(100% - 34px);
-  max-height: none;
+  max-height: 340px;
 }
 
 .review-panel-head {

@@ -654,6 +654,7 @@ mod tests {
     fn character(name: &str) -> Character {
         Character {
             id: name.to_string(),
+            project_name: None,
             name: name.to_string(),
             creator: "test".to_string(),
             description: None,

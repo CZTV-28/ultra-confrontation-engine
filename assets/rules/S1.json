@@ -101,7 +101,7 @@
       "single_effect_only": true,
       "effects_array_allowed": false,
       "official_review_required": true,
-      "required_effect_fields": ["category", "name", "description", "balance_notes"],
+      "required_effect_fields": ["category", "name", "description"],
       "optional_effect_fields": ["trigger_condition", "value", "value_unit"],
       "exclusive_rule": "one passive may describe exactly one custom effect element; examples such as hp regen, mp regen, or proximity debuff are examples only, not fixed allowed types"
     }
@@ -114,7 +114,7 @@
       "远程技能在设计阶段锁定属性，AI 在战斗中不能临时选择强化项目。默认 50 蓝、75 伤害、60% 命中率、100 射程；伤害范围 25-150，命中率 60%-100%，射程 100-200，蓝耗由曲线自动计算且不可手动输入。",
       "格挡默认 0 蓝，成功格挡减免 50% 伤害，最高可提升到 75%。如设计完美格挡反击，必须额外增加蓝耗；无论对手是否命中或是否攻击，都先结算本次格挡蓝耗。",
       "闪避默认消耗 25 蓝，闪避本次将受到的平A、近战或远程伤害，并向正后方后撤 100 格；可选择 50 蓝后撤 200 格，或选择冲刺反击，二者不可同时选择。",
-      "被动技能由玩家自定义，在角色进入模拟前生效并持续存在。S1 不预设固定被动类型，只要求每个角色最多拥有一个被动，且该被动只能描述一个单一效果元素。回血、回蓝、靠近易伤等只是示例；如果玩家设计恢复、DEBUFF、强化或其他效果，必须只写一种效果，并填写触发条件、具体说明和平衡审核说明。"
+      "被动技能由玩家自定义，在角色进入模拟前生效并持续存在。S1 不预设固定被动类型，只要求每个角色最多拥有一个被动，且该被动只能描述一个单一效果元素。回血、回蓝、靠近易伤等只是示例；如果玩家设计恢复、DEBUFF、强化或其他效果，必须只写一种效果，并填写触发条件和具体说明；平衡性由赛事官方审核判断。"
     ],
     "en": [
       "S1 Origin uses 30 simulation rounds. max_turns_per_round set to 0 means there is no per-round turn cap.",
@@ -123,7 +123,7 @@
       "Ranged skill attributes are locked at design time; the AI cannot choose temporary ranged boosts during battle. Defaults are 50 MP, 75 damage, 60% hit rate, and 100 range. Damage is 25-150, hit rate is 60%-100%, range is 100-200, and MP cost is calculated automatically by the balancing curve.",
       "Block costs 0 MP by default and reduces successful incoming damage by 50%, up to 75%. Perfect guard counterattacks require extra MP. Block MP is paid before resolution, even if the enemy misses or does not attack.",
       "Dodge costs 25 MP by default, avoids incoming basic, melee, or ranged damage this turn, and retreats 100 tiles backward. It may instead spend 50 MP for 200 retreat distance or choose a dash counter; those two options are mutually exclusive.",
-      "Passive skills are player-defined, become active before simulation starts, and remain active during simulation. S1 does not predefine fixed passive types. Each character may have at most one passive, and that passive may describe exactly one custom effect element. HP regen, MP regen, and proximity vulnerability are examples only. Recovery, debuff, buff, or other designs must be written as one effect with trigger details, effect text, and balance review notes."
+      "Passive skills are player-defined, become active before simulation starts, and remain active during simulation. S1 does not predefine fixed passive types. Each character may have at most one passive, and that passive may describe exactly one custom effect element. HP regen, MP regen, and proximity vulnerability are examples only. Recovery, debuff, buff, or other designs must be written as one effect with trigger details and effect text; balance is judged by tournament officials."
     ]
   }
 }

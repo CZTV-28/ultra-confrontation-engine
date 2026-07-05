@@ -7,9 +7,11 @@ import RulesPage from "../pages/Rules/RulesPage";
 import ReviewPage from "../pages/Review/ReviewPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
 import ReplayPage from "../pages/Replay/ReplayPage";
+import DevelopersPage from "../pages/Developers/DevelopersPage";
 import SettingsPage from "../pages/Settings/SettingsPage";
+import { readDeveloperSession } from "../services/developerAccess";
 
-type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "developers" | "settings";
 
 const pageMap: Record<string, Page> = {
   "/": "home",
@@ -19,6 +21,7 @@ const pageMap: Record<string, Page> = {
   "/review": "review",
   "/trainer": "trainer",
   "/replay": "replay",
+  "/developers": "developers",
   "/settings": "settings",
 };
 
@@ -30,11 +33,16 @@ const pathMap: Record<Page, string> = {
   review: "/review",
   trainer: "/trainer",
   replay: "/replay",
+  developers: "/developers",
   settings: "/settings",
 };
 
 function getPageFromLocation(): Page {
   return pageMap[window.location.pathname] || "home";
+}
+
+function isProtectedPage(page: Page) {
+  return page === "review" || page === "trainer" || page === "developers";
 }
 
 export default function AppRouter() {
@@ -45,6 +53,9 @@ export default function AppRouter() {
   }, []);
 
   const navigateTo = (page: Page) => {
+    if (isProtectedPage(page) && !readDeveloperSession()) {
+      page = "home";
+    }
     const path = pathMap[page];
     window.history.pushState({ page }, "", path);
     setCurrentPage(page);
@@ -69,6 +80,10 @@ export default function AppRouter() {
   };
 
   const renderPage = () => {
+    if (isProtectedPage(currentPage) && !readDeveloperSession()) {
+      return <HomePage {...pageProps} />;
+    }
+
     switch (currentPage) {
       case "battle":
         return <BattlePage {...pageProps} />;
@@ -82,6 +97,8 @@ export default function AppRouter() {
         return <TrainerPage {...pageProps} />;
       case "replay":
         return <ReplayPage {...pageProps} />;
+      case "developers":
+        return <DevelopersPage {...pageProps} />;
       case "settings":
         return <SettingsPage {...pageProps} />;
       default:

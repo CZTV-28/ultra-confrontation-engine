@@ -1,7 +1,7 @@
 use crate::battle::{Action, BattleEngine};
 use crate::loader::Loader;
 use crate::models::arena::Arena;
-use crate::models::character::Character;
+use crate::models::character::{Character, CharacterPortrait};
 use crate::models::rules::Rules;
 use crate::models::skill::Skill;
 use crate::rules::RuleEngine;
@@ -414,8 +414,22 @@ pub fn list_characters() -> Result<Vec<Character>, String> {
     let loader = Loader::new();
     ensure_assets_valid(&loader)?;
     let mut characters = loader.load_characters()?;
+    for character in &mut characters {
+        if let Some(portrait) = &mut character.portrait {
+            portrait.data_url.clear();
+        }
+    }
     characters.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
     Ok(characters)
+}
+
+#[tauri::command]
+pub fn get_character_portrait(character_id: String) -> Result<Option<CharacterPortrait>, String> {
+    let loader = Loader::new();
+    ensure_assets_valid(&loader)?;
+    loader
+        .load_character(&character_id)
+        .map(|character| character.portrait)
 }
 
 #[tauri::command]

@@ -24,13 +24,13 @@ The desktop app reads resources from `assets/`. Run `npm run sync:assets` after 
 
 ## 参赛者提交包 / Participant Submission Package
 
-UCE v0.1.1 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件。`.ucechar` 是参赛者提交给赛事官方的角色信息包，不是最终 AI 模型，也不是官方比赛资源库中的最终 `assets/characters/*.json` 文件。
+UCE v0.1.2 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件。`.ucechar` 是参赛者提交给赛事官方的角色信息包，不是最终 AI 模型，也不是官方比赛资源库中的最终 `assets/characters/*.json` 文件。
 
 `.ucechar` 文件包含：
 
 - `package_type: "uce_character_submission"`
-- `schema_version: "0.1.1"`
-- `engine_version: "0.1.1"`
+- `schema_version: "0.1.2"`
+- `engine_version: "0.1.2"`
 - `target_season: "S1"`
 - `ruleset_version: "0.1.0"`
 - `character`、`skills`、`combat_design`、`passive` 和 `training`
@@ -39,7 +39,7 @@ UCE v0.1.1 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件
 
 官方收到 `.ucechar` 后，需要进行规则审核、被动/DEBUFF/反击设计审核，再决定是否导入到官方比赛资源库。
 
-UCE v0.1.1 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
+UCE v0.1.2 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
 
 After receiving a `.ucechar` file, officials should review rule compliance, custom passive effects, debuffs, and counter designs before importing the character into the official tournament resource library.
 
@@ -50,6 +50,7 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 ```json
 {
   "id": "example_fighter",
+  "project_name": "Example AU Project",
   "name": "S1 Example Fighter",
   "creator": "creator_name",
   "description": "角色介绍、战斗定位或训练说明。",
@@ -66,7 +67,9 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 }
 ```
 
-- `id`：唯一且适合文件名的资源 ID。
+- `id`：唯一且适合文件名的资源 ID；参赛者界面会自动生成，官方审核后可再决定最终写入 ID。
+- `project_name`：同人项目名称。
+- `name`：角色名，建议使用“项目简称 + 角色名”的常用称呼，例如 `TS!Sans`。
 - `hp`：S1 固定为 500，不允许玩家手动修改。
 - `mp`：S1 固定为 250，不允许玩家手动修改。
 - `skills.melee/ranged/block/dodge`：必须引用对应类型的技能。
@@ -220,8 +223,7 @@ dash_counter = round5(clamp(25 + 15 + counter_damage / 75 * 35, 40, 80))
     "description": "当角色生命低于 30% 时，每回合结束恢复少量生命。",
     "trigger_condition": "自身生命低于 30%",
     "value": 5,
-    "value_unit": "HP/turn",
-    "balance_notes": "只提供单一恢复效果，不同时恢复蓝量，也不附带减伤、加速或其他增益。"
+    "value_unit": "HP/turn"
   },
   "description": "用于表达角色的续航风格。"
 }
@@ -232,7 +234,8 @@ S1 被动限制：
 - 被动必须设置 `single_effect: true`。
 - 被动必须设置 `official_review_required: true`。
 - `effect` 必须是一个对象，不能是数组。
-- `effect.category`、`effect.name`、`effect.description`、`effect.balance_notes` 必须填写。
+- `effect.category`、`effect.name`、`effect.description` 必须填写。
+- 平衡性说明不由参赛者填写，由赛事官方在审核阶段判断。
 - `trigger_condition`、`value`、`value_unit` 可选，但如果填写必须只服务于这个单一效果。
 - 同一个被动不能同时拥有多个效果，例如回血和回蓝同时存在、易伤同时附带减速、恢复同时附带减伤等。
 - 自定义被动当前先进入资源与审核流程；具体战斗结算需要在后续被动解释/映射系统中接入。
@@ -241,7 +244,9 @@ S1 被动限制：
 
 ### Character Resource
 
-- `id`: unique file-safe resource ID.
+- `id`: unique file-safe resource ID. Participant builds generate a draft ID; officials may decide the final written ID during review.
+- `project_name`: fan project name.
+- `name`: character name. Prefer the common "project abbreviation + character name" form, such as `TS!Sans`.
 - `hp`: fixed at 500 for S1. Players cannot manually change it.
 - `mp`: fixed at 250 for S1. Players cannot manually change it.
 - `skills.melee/ranged/block/dodge`: must reference a skill of the matching type.
@@ -360,8 +365,7 @@ Example:
     "description": "When this character is below 30% HP, recover a small amount of HP at the end of each turn.",
     "trigger_condition": "self HP below 30%",
     "value": 5,
-    "value_unit": "HP/turn",
-    "balance_notes": "This is one recovery effect only. It does not also restore MP, reduce damage, increase speed, or apply another buff."
+    "value_unit": "HP/turn"
   },
   "description": "Defines the character's sustain style."
 }
@@ -372,7 +376,8 @@ S1 passive limits:
 - Passive must set `single_effect: true`.
 - Passive must set `official_review_required: true`.
 - `effect` must be one object, not an array.
-- `effect.category`, `effect.name`, `effect.description`, and `effect.balance_notes` are required.
+- `effect.category`, `effect.name`, and `effect.description` are required.
+- Balance notes are not written by participants; tournament officials judge balance during review.
 - `trigger_condition`, `value`, and `value_unit` are optional, but if present they must support the same single effect.
 - One passive cannot bundle multiple effects, such as HP regen plus MP regen, vulnerability plus slow, or recovery plus damage reduction.
 - Custom passives currently enter the resource and review workflow first. Battle resolution requires a later passive interpretation/mapping system.

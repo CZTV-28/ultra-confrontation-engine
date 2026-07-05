@@ -153,7 +153,7 @@ const content = {
         items: [
           "每名角色最多拥有一个自定义被动。",
           "被动只能描述一个单一效果元素。",
-          "自定义被动必须填写效果说明与平衡审核说明。",
+          "自定义被动必须填写效果说明，平衡性由赛事官方审核判断。",
         ],
       },
     ],
@@ -225,7 +225,7 @@ const content = {
         items: [
           "Each character may have at most one custom passive.",
           "A passive may describe only one single effect element.",
-          "Custom passives must include effect text and balance review notes.",
+          "Custom passives must include effect text; balance is judged by tournament officials.",
         ],
       },
     ],

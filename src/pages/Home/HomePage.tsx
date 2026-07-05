@@ -19,9 +19,15 @@ import logoSmallCn from "../../assets/images/logo-parts/logo-fragment-small-cn.p
 import logoSoul from "../../assets/images/logo-parts/logo-fragment-soul.png";
 import logoWhiteSlash from "../../assets/images/logo-parts/logo-fragment-white-slash.png";
 import logoYellowCore from "../../assets/images/logo-parts/logo-fragment-yellow-core.png";
+import {
+  clearDeveloperSession,
+  readDeveloperSession,
+  type DeveloperSession,
+  verifyDeveloperLogin,
+} from "../../services/developerAccess";
 import "./HomePage.css";
 
-type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "settings";
+type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "developers" | "settings";
 type SceneId = Page;
 type HomeMode = "participant" | "developer";
 
@@ -65,6 +71,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
   replay: {
     accent: [255, 255, 255],
     secondary: [184, 92, 255],
+    tertiary: [91, 231, 255],
+  },
+  developers: {
+    accent: [255, 104, 198],
+    secondary: [142, 255, 122],
     tertiary: [91, 231, 255],
   },
   settings: {
@@ -114,6 +125,10 @@ function createToneStyle(tone: SceneTone): CSSProperties {
     "--home-secondary-rgb": rgbValue(tone.secondary),
     "--home-tertiary-rgb": rgbValue(tone.tertiary),
   } as CSSProperties;
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
 }
 
 interface HomePageProps {
@@ -176,35 +191,34 @@ function HomeEnglishLogoFragments() {
   );
 }
 
-function readInitialHomeMode(): HomeMode {
-  if (typeof window === "undefined") {
-    return "participant";
-  }
-
-  return window.localStorage.getItem("uce_home_mode") === "developer" ? "developer" : "participant";
-}
-
 export default function HomePage({ navigateTo }: HomePageProps) {
   const { i18n } = useTranslation();
-  const [homeMode, setHomeMode] = useState<HomeMode>(() => readInitialHomeMode());
+  const [homeMode, setHomeMode] = useState<HomeMode>("participant");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [developerSession, setDeveloperSession] = useState<DeveloperSession | null>(() => readDeveloperSession());
+  const [showDeveloperLogin, setShowDeveloperLogin] = useState(false);
+  const [developerId, setDeveloperId] = useState("");
+  const [developerKey, setDeveloperKey] = useState("");
+  const [loginError, setLoginError] = useState("");
   const isEnglish = i18n.language.startsWith("en");
 
   const sidebarItems: SidebarItem[] = useMemo(
     () =>
       homeMode === "developer"
         ? [
+            { id: "rules", label: isEnglish ? "Events" : "赛事", icon: "E", page: "rules" },
             { id: "battle", label: isEnglish ? "Battle Sim" : "模拟对战", icon: "B", page: "battle" },
             { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
-            { id: "rules", label: isEnglish ? "Events" : "赛事", icon: "E", page: "rules" },
             { id: "review", label: isEnglish ? "Official Review" : "官方审核", icon: "V", page: "review" },
+            { id: "developers", label: isEnglish ? "Developers" : "开发者列表", icon: "D", page: "developers" },
             { id: "trainer", label: isEnglish ? "AI Trainer" : "AI训练", icon: "T", page: "trainer" },
             { id: "replay", label: isEnglish ? "Replay" : "回放", icon: "P", page: "replay" },
             { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
           ]
         : [
-            { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
             { id: "rules", label: isEnglish ? "Events" : "赛事", icon: "E", page: "rules" },
+            { id: "battle", label: isEnglish ? "Battle Sim" : "模拟对战", icon: "B", page: "battle" },
+            { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
             { id: "settings", label: isEnglish ? "Settings" : "设置", icon: "S", page: "settings" },
           ],
     [homeMode, isEnglish],
@@ -276,13 +290,62 @@ export default function HomePage({ navigateTo }: HomePageProps) {
     [],
   );
 
+  const enterParticipantMode = () => {
+    setHomeMode("participant");
+    setShowDeveloperLogin(false);
+    setLoginError("");
+  };
+
+  const requestDeveloperMode = async () => {
+    const activeSession = readDeveloperSession();
+    if (activeSession) {
+      setDeveloperSession(activeSession);
+      setHomeMode("developer");
+      setShowDeveloperLogin(false);
+      setLoginError("");
+      return;
+    }
+
+    setHomeMode("participant");
+    setShowDeveloperLogin(true);
+    setLoginError("");
+  };
+
+  const submitDeveloperLogin = async () => {
+    const session = await verifyDeveloperLogin(developerId, developerKey);
+    if (!session) {
+      setLoginError(isEnglish ? "Developer ID or key is incorrect." : "开发者 ID 或密钥不正确。");
+      return;
+    }
+
+    setDeveloperSession(session);
+    setHomeMode("developer");
+    setShowDeveloperLogin(false);
+    setDeveloperKey("");
+    setLoginError("");
+  };
+
+  const logoutDeveloper = () => {
+    clearDeveloperSession();
+    setDeveloperSession(null);
+    enterParticipantMode();
+  };
+
   useEffect(() => {
-    window.localStorage.setItem("uce_home_mode", homeMode);
     setSelectedIndex(0);
   }, [homeMode]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (showDeveloperLogin && isTypingTarget(e.target)) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowDeveloperLogin(false);
+          setLoginError("");
+        }
+        return;
+      }
+
       if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
         setSelectedIndex((prev) => (prev === 0 ? sidebarItems.length - 1 : prev - 1));
@@ -291,9 +354,21 @@ export default function HomePage({ navigateTo }: HomePageProps) {
         setSelectedIndex((prev) => (prev === sidebarItems.length - 1 ? 0 : prev + 1));
       } else if (e.key === "Tab") {
         e.preventDefault();
-        setHomeMode((current) => (current === "participant" ? "developer" : "participant"));
+        if (homeMode === "participant") {
+          void requestDeveloperMode();
+        } else {
+          enterParticipantMode();
+        }
+      } else if ((e.key === "Escape" || e.key === "x" || e.key === "X") && showDeveloperLogin) {
+        e.preventDefault();
+        setShowDeveloperLogin(false);
+        setLoginError("");
       } else if (e.key === "z" || e.key === "Z" || e.key === "Enter") {
         e.preventDefault();
+        if (showDeveloperLogin) {
+          void submitDeveloperLogin();
+          return;
+        }
         const page = sidebarItems[selectedIndex].page;
         if (page && page !== "home") {
           navigateTo(page);
@@ -303,7 +378,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigateTo, selectedIndex, sidebarItems]);
+  }, [homeMode, navigateTo, selectedIndex, showDeveloperLogin, sidebarItems]);
 
   useEffect(() => {
     const fromTone = themeToneRef.current;
@@ -342,16 +417,16 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             <button
               className={homeMode === "participant" ? "home-mode-active" : ""}
               type="button"
-              onClick={() => setHomeMode("participant")}
+              onClick={enterParticipantMode}
             >
               {isEnglish ? "Player" : "参赛者"}
             </button>
             <button
               className={homeMode === "developer" ? "home-mode-active" : ""}
               type="button"
-              onClick={() => setHomeMode("developer")}
+              onClick={() => void requestDeveloperMode()}
             >
-              {isEnglish ? "Dev" : "开发者"}
+              {isEnglish ? "Staff" : "内部"}
             </button>
           </div>
 
@@ -371,7 +446,12 @@ export default function HomePage({ navigateTo }: HomePageProps) {
           </nav>
 
           <div className="home-version">
-            v0.1.1 {homeMode === "developer" ? "DEVELOPER" : "PARTICIPANT"}
+            <span>UCE v0.1.2</span>
+            {homeMode === "developer" && developerSession ? (
+              <button type="button" onClick={logoutDeveloper}>
+                {isEnglish ? "Logout" : "退出登录"}
+              </button>
+            ) : null}
           </div>
         </aside>
 
@@ -478,8 +558,51 @@ export default function HomePage({ navigateTo }: HomePageProps) {
         <footer className="home-footer">
           <span><span className="home-footer-heart">♥</span> {isEnglish ? "Confirm" : "确认"}</span>
           <span><span className="home-footer-x">X</span> {isEnglish ? "Back" : "返回"}</span>
-          <span><span className="home-footer-x">Tab</span> {isEnglish ? "Mode" : "模式"}</span>
+          <span>
+            <span className="home-footer-x">Tab</span>{" "}
+            {homeMode === "developer" ? (isEnglish ? "Player Mode" : "参赛者模式") : (isEnglish ? "Staff Login" : "内部登录")}
+          </span>
         </footer>
+
+        {showDeveloperLogin ? (
+          <div className="home-login-layer" role="dialog" aria-modal="true" aria-label="Developer login">
+            <form
+              className="home-login-panel"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitDeveloperLogin();
+              }}
+            >
+              <div className="home-login-kicker">{isEnglish ? "Restricted Access" : "内部访问"}</div>
+              <h2>{isEnglish ? "Staff Verification" : "开发者身份验证"}</h2>
+              <label>
+                <span>{isEnglish ? "Developer ID" : "开发者 ID"}</span>
+                <input
+                  value={developerId}
+                  onChange={(event) => setDeveloperId(event.target.value)}
+                  autoFocus
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                <span>{isEnglish ? "Developer Key" : "开发者密钥"}</span>
+                <input
+                  type="password"
+                  value={developerKey}
+                  onChange={(event) => setDeveloperKey(event.target.value)}
+                  autoComplete="current-password"
+                />
+              </label>
+              {loginError ? <p className="home-login-error">{loginError}</p> : null}
+              <div className="home-login-actions">
+                <button type="submit">{isEnglish ? "Enter" : "进入"}</button>
+                <button type="button" onClick={() => setShowDeveloperLogin(false)}>
+                  {isEnglish ? "Cancel" : "取消"}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </div>
     </UCWindow>
   );

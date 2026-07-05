@@ -1,0 +1,11 @@
+{
+  "damage": 25,
+  "id": "dcpe_sans_melee",
+  "max_damage": 75,
+  "max_mp_cost": 50,
+  "min_damage": 10,
+  "min_mp_cost": 0,
+  "mp_cost": 10,
+  "name": "残尘逐悔",
+  "type": "melee"
+}

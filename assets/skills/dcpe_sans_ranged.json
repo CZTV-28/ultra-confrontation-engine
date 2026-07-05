@@ -1,0 +1,20 @@
+{
+  "damage": 29,
+  "hit_rate": 1,
+  "id": "dcpe_sans_ranged",
+  "knockback": 0,
+  "max_damage": 150,
+  "max_hit_rate": 1,
+  "max_knockback": 100,
+  "max_mp_cost": 100,
+  "max_range": 200,
+  "min_damage": 25,
+  "min_hit_rate": 0.6,
+  "min_knockback": 0,
+  "min_mp_cost": 25,
+  "min_range": 100,
+  "mp_cost": 55,
+  "name": "空寂尘棘",
+  "range": 100,
+  "type": "ranged"
+}

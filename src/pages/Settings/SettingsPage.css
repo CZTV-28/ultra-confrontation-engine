@@ -1,93 +1,240 @@
-.settings-title {
-  color: white;
-  font-size: 32px;
-  margin-bottom: 40px;
+.settings-shell {
+  width: 100vw;
+  height: 100vh;
+  padding: 28px;
+  box-sizing: border-box;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(159, 124, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 24%, rgba(76, 201, 255, 0.14), transparent 30%),
+    linear-gradient(180deg, #020106 0%, #06020f 100%);
+  overflow: hidden;
 }
 
-.settings-section {
-  margin-bottom: 32px;
-}
-
-.settings-label {
-  color: #ccc;
-  font-size: 20px;
-  margin-bottom: 14px;
-}
-
-.settings-options {
+.settings-header {
+  height: 92px;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 6px 20px;
+  box-sizing: border-box;
 }
 
-.settings-option-btn {
-  padding: 10px 20px;
-  background: black;
-  color: white;
-  border: 2px solid #555;
-  font-size: 16px;
-  font-family: inherit;
+.settings-header span,
+.settings-card-copy span {
+  color: #4cc9ff;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.settings-header h1 {
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: 34px;
+  line-height: 1;
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, 0.28),
+    0 0 28px rgba(159, 124, 255, 0.24);
+}
+
+.settings-header button,
+.settings-language-button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, rgba(159, 124, 255, 0.2), rgba(76, 201, 255, 0.12)),
+    rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
   cursor: none;
-  transition: 0.2s;
+  box-shadow:
+    inset 0 0 14px rgba(255, 255, 255, 0.04),
+    0 0 18px rgba(76, 201, 255, 0.12);
 }
 
-.settings-option-btn:hover {
-  border-color: white;
+.settings-header button {
+  min-width: 116px;
 }
 
-.settings-option-active {
-  border-color: #ffff00;
-  color: #ffff00;
-  text-shadow: 0 0 8px #ffff00;
+.settings-board {
+  height: calc(100vh - 148px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(174px, auto);
+  gap: 18px;
+}
+
+.settings-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.1fr);
+  gap: 22px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    rgba(0, 0, 0, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(76, 201, 255, 0.1);
+}
+
+.settings-card-copy {
+  min-width: 0;
+}
+
+.settings-card-copy h2 {
+  margin: 9px 0 10px;
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.settings-card-copy p {
+  min-height: 48px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.settings-control {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.settings-value {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  min-width: 118px;
+  padding: 0 14px;
+  border: 1px solid rgba(76, 201, 255, 0.36);
+  border-radius: 4px;
+  color: #ffffff;
+  background: rgba(76, 201, 255, 0.08);
+  font-size: 18px;
+  text-shadow: 0 0 10px rgba(76, 201, 255, 0.42);
 }
 
 .settings-slider {
   width: 100%;
   height: 6px;
-  -webkit-appearance: none;
   appearance: none;
-  background: #333;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(159, 124, 255, 0.88), rgba(76, 201, 255, 0.82)),
+    #252535;
   outline: none;
 }
 
 .settings-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
   width: 20px;
   height: 20px;
-  background: white;
-  border: 2px solid white;
+  appearance: none;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #05050a;
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.54),
+    0 0 20px rgba(76, 201, 255, 0.32);
   cursor: none;
 }
 
 .settings-slider-scale {
   display: flex;
   justify-content: space-between;
-  margin-top: 10px;
-  color: #777;
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
 }
 
-.settings-guide {
-  margin-top: 40px;
-  padding-top: 24px;
-  border-top: 1px solid #333;
+.settings-card-language {
+  grid-template-columns: minmax(220px, 1fr) 210px;
 }
 
-.settings-guide-title {
-  color: #888;
-  font-size: 18px;
-  margin-bottom: 16px;
+.settings-language-button {
+  width: 210px;
+  justify-self: end;
+  white-space: nowrap;
 }
 
-.settings-guide-grid {
+.settings-card-keys {
+  grid-column: 1 / 3;
+  grid-template-columns: 250px minmax(0, 1fr);
+}
+
+.settings-key-grid {
+  min-width: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 24px;
-  color: #666;
-  font-size: 15px;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
 }
 
-.guide-key {
-  color: #ffff00;
+.settings-key-row {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.settings-key-row kbd {
+  min-width: 0;
+  color: #4cc9ff;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.settings-key-row span {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.78);
   font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1080px) {
+  .settings-shell {
+    padding: 18px;
+    overflow: auto;
+  }
+
+  .settings-board {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card,
+  .settings-card-language,
+  .settings-card-keys {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .settings-language-button {
+    justify-self: start;
+  }
+
+  .settings-key-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .settings-key-grid {
+    grid-template-columns: 1fr;
+  }
 }

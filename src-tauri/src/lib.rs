@@ -15,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             battle_cmd::list_characters,
+            battle_cmd::get_character_portrait,
             battle_cmd::list_arenas,
             battle_cmd::list_rulesets,
             battle_cmd::list_skills,

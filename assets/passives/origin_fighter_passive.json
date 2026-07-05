@@ -1,0 +1,17 @@
+{
+  "description": "",
+  "effect": {
+    "category": "debuff",
+    "description": "达成触发条件时，对方格挡无效",
+    "name": "强攻",
+    "trigger_condition": "两者距离小于50",
+    "value": null,
+    "value_unit": null
+  },
+  "id": "origin_fighter_passive",
+  "name": "Origin Passive",
+  "official_review_required": true,
+  "single_effect": true,
+  "timing": "before_simulation_persistent",
+  "type": "passive"
+}

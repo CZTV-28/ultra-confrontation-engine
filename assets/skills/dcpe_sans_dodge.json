@@ -1,0 +1,7 @@
+{
+  "id": "dcpe_sans_dodge",
+  "mp_cost": 45,
+  "name": "Origin Dodge",
+  "retreat_distance": 100,
+  "type": "dodge"
+}
