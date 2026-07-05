@@ -4,6 +4,35 @@ All notable changes to Ultra Confrontation Engine are documented in this file.
 
 The project uses SemVer-style versions during early development. While UCE is still in the `0.x` line, patch releases may contain participant-facing iteration work, and larger capability milestones should move the minor version.
 
+## [0.1.2] - 2026-07-06
+
+### Developer Access Update
+
+#### 中文
+
+- 将 UCE 版本号更新为 `v0.1.2`，默认启动进入参赛者模式。
+- 新增开发者 ID 与开发者密钥验证，官方审核、AI 训练和开发者列表入口需要验证后访问。
+- 新增开发者列表页面，项目所有者可以添加开发者信息和头像，其他开发者只能查看。
+- 重构设置页面和开发者列表布局，并将主页入口文案统一为“开发者”。
+
+#### English
+
+- Updated UCE to `v0.1.2`, with participant mode as the default startup mode.
+- Added developer ID and developer key verification for Official Review, AI Trainer, and Developer List access.
+- Added the Developer List page. The project owner can add developer profiles and avatars, while other developers have read-only access.
+- Reworked the Settings page and Developer List layout, and unified the home entry wording as “Developer”.
+
+This text was translated with AI. Please forgive any errors.
+
+#### 日本語
+
+- UCE を `v0.1.2` に更新し、起動時の初期モードを参加者モードにしました。
+- 公式審査、AI トレーナー、開発者リストにアクセスするための開発者 ID と開発者キー認証を追加しました。
+- 開発者リストページを追加しました。プロジェクト所有者は開発者情報とアバターを追加でき、他の開発者は閲覧のみ可能です。
+- 設定ページと開発者リストのレイアウトを調整し、ホーム画面の入口表記を「開発者」に統一しました。
+
+この本文はAI翻訳を使用しています。誤りがある場合はご了承ください。
+
 ## [0.1.1] - 2026-07-05
 
 ### Final Refresh - 2026-07-05

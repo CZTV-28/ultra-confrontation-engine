@@ -426,7 +426,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
               type="button"
               onClick={() => void requestDeveloperMode()}
             >
-              {isEnglish ? "Staff" : "内部"}
+              {isEnglish ? "Developer" : "开发者"}
             </button>
           </div>
 
@@ -560,7 +560,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
           <span><span className="home-footer-x">X</span> {isEnglish ? "Back" : "返回"}</span>
           <span>
             <span className="home-footer-x">Tab</span>{" "}
-            {homeMode === "developer" ? (isEnglish ? "Player Mode" : "参赛者模式") : (isEnglish ? "Staff Login" : "内部登录")}
+            {homeMode === "developer" ? (isEnglish ? "Player Mode" : "参赛者模式") : (isEnglish ? "Developer Login" : "开发者登录")}
           </span>
         </footer>
 
@@ -573,8 +573,8 @@ export default function HomePage({ navigateTo }: HomePageProps) {
                 void submitDeveloperLogin();
               }}
             >
-              <div className="home-login-kicker">{isEnglish ? "Restricted Access" : "内部访问"}</div>
-              <h2>{isEnglish ? "Staff Verification" : "开发者身份验证"}</h2>
+              <div className="home-login-kicker">{isEnglish ? "Developer Access" : "开发者访问"}</div>
+              <h2>{isEnglish ? "Developer Verification" : "开发者身份验证"}</h2>
               <label>
                 <span>{isEnglish ? "Developer ID" : "开发者 ID"}</span>
                 <input

@@ -26,7 +26,7 @@ export interface DeveloperDraft {
 const DEVELOPERS_STORAGE_KEY = "uce_developers_v1";
 const SESSION_STORAGE_KEY = "uce_developer_session_v1";
 const DEFAULT_OWNER_ID = "CZTV-28";
-const DEFAULT_OWNER_KEY_HASH = "6df72d113b4da4a64e2bbb7420bde5597061fd5c16ace30320b3b3046a51f4e2";
+const DEFAULT_OWNER_KEY_HASH = "088e5484e915c5d217a42d42b950f867a96e1e53bec2380e5a505924a8b7af6f";
 
 const defaultOwner: DeveloperProfile = {
   id: DEFAULT_OWNER_ID,

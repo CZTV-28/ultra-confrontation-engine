@@ -17,6 +17,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  width: min(1320px, 100%);
+  margin: 0 auto;
   padding: 0 6px 20px;
   box-sizing: border-box;
 }
@@ -62,8 +64,10 @@
 
 .developers-content {
   height: calc(100vh - 148px);
+  width: min(1320px, 100%);
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(520px, 1fr) 420px;
   gap: 18px;
 }
 
@@ -81,21 +85,21 @@
 
 .developers-list {
   min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   padding: 18px;
   overflow: auto;
 }
 
 .developers-card {
-  min-height: 126px;
+  min-height: 136px;
   position: relative;
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 14px;
-  padding: 16px;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
   background:
@@ -139,7 +143,8 @@
 
 .developers-info dl {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
   margin: 0;
 }
 
@@ -160,9 +165,8 @@
 }
 
 .developers-owner {
-  position: absolute;
-  right: 12px;
-  top: 12px;
+  position: static;
+  align-self: start;
   padding: 3px 8px;
   border: 1px solid rgba(255, 200, 87, 0.58);
   border-radius: 4px;
@@ -266,5 +270,19 @@
 
   .developers-list {
     max-height: 52vh;
+  }
+
+  .developers-card {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+
+  .developers-info dl {
+    grid-template-columns: 1fr;
+  }
+
+  .developers-owner {
+    position: absolute;
+    right: 12px;
+    top: 12px;
   }
 }
