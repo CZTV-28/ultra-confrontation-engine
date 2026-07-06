@@ -6,12 +6,23 @@ import CreatorPage from "../pages/Creator/CreatorPage";
 import RulesPage from "../pages/Rules/RulesPage";
 import ReviewPage from "../pages/Review/ReviewPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
+import TournamentBattlePage from "../pages/TournamentBattle/TournamentBattlePage";
 import ReplayPage from "../pages/Replay/ReplayPage";
 import DevelopersPage from "../pages/Developers/DevelopersPage";
 import SettingsPage from "../pages/Settings/SettingsPage";
 import { readDeveloperSession } from "../services/developerAccess";
 
-type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "developers" | "settings";
+type Page =
+  | "home"
+  | "battle"
+  | "creator"
+  | "rules"
+  | "review"
+  | "trainer"
+  | "tournamentBattle"
+  | "replay"
+  | "developers"
+  | "settings";
 
 const pageMap: Record<string, Page> = {
   "/": "home",
@@ -20,6 +31,7 @@ const pageMap: Record<string, Page> = {
   "/rules": "rules",
   "/review": "review",
   "/trainer": "trainer",
+  "/tournament-battle": "tournamentBattle",
   "/replay": "replay",
   "/developers": "developers",
   "/settings": "settings",
@@ -32,6 +44,7 @@ const pathMap: Record<Page, string> = {
   rules: "/rules",
   review: "/review",
   trainer: "/trainer",
+  tournamentBattle: "/tournament-battle",
   replay: "/replay",
   developers: "/developers",
   settings: "/settings",
@@ -42,7 +55,7 @@ function getPageFromLocation(): Page {
 }
 
 function isProtectedPage(page: Page) {
-  return page === "review" || page === "trainer" || page === "developers";
+  return page === "review" || page === "trainer" || page === "tournamentBattle" || page === "developers";
 }
 
 export default function AppRouter() {
@@ -95,6 +108,8 @@ export default function AppRouter() {
         return <ReviewPage {...pageProps} />;
       case "trainer":
         return <TrainerPage {...pageProps} />;
+      case "tournamentBattle":
+        return <TournamentBattlePage {...pageProps} />;
       case "replay":
         return <ReplayPage {...pageProps} />;
       case "developers":

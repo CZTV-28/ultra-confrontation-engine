@@ -27,7 +27,17 @@ import {
 } from "../../services/developerAccess";
 import "./HomePage.css";
 
-type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "replay" | "developers" | "settings";
+type Page =
+  | "home"
+  | "battle"
+  | "creator"
+  | "rules"
+  | "review"
+  | "trainer"
+  | "tournamentBattle"
+  | "replay"
+  | "developers"
+  | "settings";
 type SceneId = Page;
 type HomeMode = "participant" | "developer";
 
@@ -69,6 +79,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
     accent: [46, 242, 255],
     secondary: [142, 255, 122],
     tertiary: [136, 104, 255],
+  },
+  tournamentBattle: {
+    accent: [255, 200, 87],
+    secondary: [255, 104, 198],
+    tertiary: [91, 231, 255],
   },
   replay: {
     accent: [255, 255, 255],
@@ -235,6 +250,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             { id: "battle", label: isEnglish ? "Battle Sim" : "模拟对战", icon: "B", page: "battle" },
             { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
             { id: "review", label: isEnglish ? "Official Review" : "官方审核", icon: "V", page: "review" },
+            { id: "tournamentBattle", label: isEnglish ? "Tournament Battle" : "赛事对战", icon: "M", page: "tournamentBattle" },
             { id: "developers", label: isEnglish ? "Developers" : "开发者列表", icon: "D", page: "developers" },
             { id: "trainer", label: isEnglish ? "AI Trainer" : "AI训练", icon: "T", page: "trainer" },
             { id: "replay", label: isEnglish ? "Replay" : "回放", icon: "P", page: "replay" },

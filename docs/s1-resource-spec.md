@@ -37,6 +37,7 @@ UCE v0.1.2 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件
 - `engine_version: "0.1.2"`
 - `target_season: "S1"`
 - `ruleset_version: "0.1.0"`
+- `season_template`：记录当前角色设计模板 ID、名称、规则版本和角色默认值；后续赛季可以拥有独立模板。
 - `character`、`skills`、`combat_design`、`passive` 和 `training`
 - `export.checksum_algorithm: "SHA-256"`
 - `export.checksum`：导出时生成的校验码，用于辅助识别文件是否被手动改动
@@ -80,6 +81,7 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 - The current file starts in `preparing` state and can be updated later by official match results.
 - Official S1 battle results write `winnerSlot`, `loserSlot`, optional `replayId`, and `updatedAt` to the matched bracket entry.
 - Later rounds resolve entrants from their `sources`; `MATCH_ID` means the source winner, and `MATCH_ID:loser` means the source loser.
+- Sandbox Battle Simulation is not an official tournament match. Only the tournament battle flow should write official match results.
 
 - 晋级表分为左半区和右半区。
 - 第一轮直接引用 S1 名单席位。
@@ -88,6 +90,7 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 - 当前文件处于 `preparing` 筹备状态，后续可由官方比赛结果更新。
 - 官方 S1 模拟对局结果会向对应对局写入 `winnerSlot`、`loserSlot`、可选的 `replayId` 和 `updatedAt`。
 - 后续轮次会从 `sources` 自动解析晋级者；`MATCH_ID` 表示来源对局胜者，`MATCH_ID:loser` 表示来源对局败者。
+- 普通模拟对战不算官方赛事对局。只有赛事对战流程可以写入官方对局结果。
 
 ## 中文规则
 

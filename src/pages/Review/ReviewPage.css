@@ -519,6 +519,49 @@
   word-break: break-word;
 }
 
+.review-assets-editor textarea {
+  width: 100%;
+  min-height: 360px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid rgba(142, 255, 122, 0.18);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    rgba(0, 0, 0, 0.58);
+  background-size: 100% 22px;
+  color: rgba(232, 255, 238, 0.86);
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  outline: none;
+  padding: 12px;
+  white-space: pre;
+}
+
+.review-assets-editor textarea:focus {
+  border-color: rgba(142, 255, 122, 0.48);
+  box-shadow:
+    0 0 0 1px rgba(142, 255, 122, 0.12),
+    0 0 18px rgba(142, 255, 122, 0.1);
+}
+
+.review-panel-head > button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid rgba(142, 255, 122, 0.28);
+  border-radius: 5px;
+  background: rgba(142, 255, 122, 0.08);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.review-panel-head > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .review-preview {
   min-height: 260px;
   max-height: 420px;

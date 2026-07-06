@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
+import {
+  getSeasonTemplate,
+  seasonTemplates,
+  type SeasonId,
+  type SeasonTemplate,
+} from "../../services/seasonTemplates";
 import { normalizePortraitDataUrl } from "../../utils/portraitImage";
 import "./CreatorPage.css";
 
@@ -71,24 +77,17 @@ interface PortraitDraft {
 }
 
 const skillKinds: SkillKind[] = ["basic", "melee", "ranged", "block", "dodge", "passive"];
-const basicDamageTable: Record<number, number> = {
-  0: 10,
-  5: 20,
-  10: 26,
-  15: 31,
-  20: 35,
-  25: 38,
-  30: 40,
-};
 
 const UCE_VERSION = "0.1.2";
 const CHARACTER_SCHEMA_VERSION = "0.1.2";
-const S1_RULESET_VERSION = "0.1.0";
 
 const copy = {
   zh: {
     title: "角色设计",
-    subtitle: "S1 参赛角色文件生成器",
+    subtitle: "赛季制参赛角色文件生成器",
+    seasonTemplate: "赛季模板",
+    templateRuleset: "规则版本",
+    templateLocked: "当前赛季模板",
     identity: "角色资料",
     combat: "技能参数",
     preview: "资源预览",
@@ -153,12 +152,15 @@ const copy = {
     meleeNote: "近战需距离 10 格以内，判定范围为正前方 120 度扇形。加伤害与挂 DEBUFF 只能二选一。",
     rangedNote: "远程技能在设计阶段锁死属性，AI 战斗中不能临时选择强化项；蓝耗由程序按曲线自动计算。",
     blockNote: "格挡先结算蓝耗，再判断是否成功。即使对方没有命中或没有攻击，本次蓝耗也会丢失。",
-    dodgeNote: "闪避默认消耗 25 蓝并后撤 100 格，可选择双倍后撤或冲刺反击，二者不可同时选择。",
-    passiveNote: "被动技能由玩家自定义，在角色进入模拟前生效，并在模拟中持续存在。这里不预设固定类型，但必须只填写一个单一效果元素；如果要写恢复、DEBUFF、强化等方向，只能选择其中一种并写清楚效果，交由官方审核。",
+    dodgeNote: "闪避默认消耗当前赛季模板规定的蓝量并按模板后撤，可选择双倍后撤或冲刺反击，二者不可同时选择。",
+    passiveNote: "被动技能由玩家自定义，在角色进入模拟前生效，并在模拟中持续存在。当前赛季模板不预设固定类型，但必须只填写一个单一效果元素；如果要写恢复、DEBUFF、强化等方向，只能选择其中一种并写清楚效果，交由官方审核。",
   },
   en: {
     title: "Character Forge",
-    subtitle: "S1 Participant Character Generator",
+    subtitle: "Season-based Participant Character Generator",
+    seasonTemplate: "Season Template",
+    templateRuleset: "Ruleset Version",
+    templateLocked: "Current Season Template",
     identity: "Character",
     combat: "Skill Parameters",
     preview: "Resource Preview",
@@ -223,8 +225,8 @@ const copy = {
     meleeNote: "Melee requires distance within 10 and a 120-degree forward cone. Damage boost and debuff mode are mutually exclusive.",
     rangedNote: "Ranged attributes are locked at design time. The AI cannot choose temporary ranged boosts in battle; MP cost is calculated by curve.",
     blockNote: "Block MP is paid before hit resolution. MP is lost even when the enemy misses or does not attack.",
-    dodgeNote: "Dodge costs 25 MP and retreats 100 by default. Double retreat and dash counter are mutually exclusive.",
-    passiveNote: "Passive skills are player-defined, become active before simulation starts, and remain active during simulation. S1 does not predefine fixed passive types, but each passive may contain only one single effect element. Recovery, debuff, buff, or other concepts must be written as one effect for official review.",
+    dodgeNote: "Dodge uses the current season template's default MP cost and retreat distance. Double retreat and dash counter are mutually exclusive.",
+    passiveNote: "Passive skills are player-defined, become active before simulation starts, and remain active during simulation. The current season template does not predefine fixed passive types, but each passive may contain only one single effect element. Recovery, debuff, buff, or other concepts must be written as one effect for official review.",
   },
 };
 
@@ -249,44 +251,76 @@ function numberInput(value: number, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function isFiveStep(value: number) {
-  return Number.isInteger(value) && value % 5 === 0;
+function isStep(value: number, step: number) {
+  return Number.isInteger(value) && value % step === 0;
 }
 
-function basicDamage(mpSpend: number) {
-  const spend = clamp(roundToStep(mpSpend, 5), 0, 30);
-  return basicDamageTable[spend] ?? 10;
+function basicDamage(mpSpend: number, template: SeasonTemplate) {
+  const spend = clamp(
+    roundToStep(mpSpend, template.basicAttack.mpStep),
+    template.basicAttack.minMpSpend,
+    template.basicAttack.maxMpSpend,
+  );
+  return template.basicAttack.damageTable[spend] ?? template.basicAttack.baseDamage;
 }
 
-function rangedMpCost(ranged: RangedDraft) {
+function rangedMpCost(ranged: RangedDraft, template: SeasonTemplate) {
+  const rules = template.ranged;
   const damageDelta =
-    ranged.damage >= 75
-      ? ((ranged.damage - 75) / 75) * 25
-      : -((75 - ranged.damage) / 50) * 25;
-  const hitDelta = ((ranged.hitRate - 0.6) / 0.4) * 25;
-  const rangeDelta = ((ranged.range - 100) / 100) * 15;
-  const boostedCount = [ranged.damage > 75, ranged.hitRate > 0.6, ranged.range > 100].filter(Boolean).length;
-  return clamp(roundToStep(50 + damageDelta + hitDelta + rangeDelta + boostedCount * 5, 5), 25, 100);
+    ranged.damage >= rules.defaultDamage
+      ? ((ranged.damage - rules.defaultDamage) / (rules.maxDamage - rules.defaultDamage)) * rules.damageCostAtMax
+      : -((rules.defaultDamage - ranged.damage) / (rules.defaultDamage - rules.minDamage)) * rules.damageCostAtMax;
+  const hitDelta =
+    ((ranged.hitRate - rules.minHitRate) / (rules.maxHitRate - rules.minHitRate)) * rules.hitCostAtMax;
+  const rangeDelta =
+    ((ranged.range - rules.minRange) / (rules.maxRange - rules.minRange)) * rules.rangeCostAtMax;
+  const boostedCount = [
+    ranged.damage > rules.defaultDamage,
+    ranged.hitRate > rules.defaultHitRate,
+    ranged.range > rules.defaultRange,
+  ].filter(Boolean).length;
+  return clamp(
+    roundToStep(
+      rules.defaultMpCost + damageDelta + hitDelta + rangeDelta + boostedCount * rules.boostedAttributeCost,
+      rules.mpStep,
+    ),
+    rules.minMpCost,
+    rules.maxMpCost,
+  );
 }
 
-function blockMpCost(block: BlockDraft) {
-  const reductionCost = ((block.damageReduction - 0.5) / 0.25) * 30;
-  const counterCost = block.perfectCounter ? 15 + (block.counterDamage / 75) * 35 : 0;
-  return clamp(roundToStep(reductionCost + counterCost, 5), 0, 80);
+function blockMpCost(block: BlockDraft, template: SeasonTemplate) {
+  const rules = template.block;
+  const reductionCost =
+    ((block.damageReduction - rules.minReduction) / (rules.maxReduction - rules.minReduction)) *
+    rules.reductionCostAtMax;
+  const counterCost = block.perfectCounter
+    ? rules.counterBaseCost + (block.counterDamage / rules.counterDamageMax) * rules.counterCostAtMax
+    : 0;
+  return clamp(roundToStep(reductionCost + counterCost, rules.mpStep), rules.minMpCost, rules.maxMpCost);
 }
 
-function dodgeMpCost(dodge: DodgeDraft) {
+function dodgeMpCost(dodge: DodgeDraft, template: SeasonTemplate) {
   if (dodge.mode === "double_retreat") {
-    return 50;
+    return template.dodge.doubleRetreatMpCost;
   }
   if (dodge.mode === "counter") {
-    return clamp(roundToStep(25 + 15 + (dodge.counterDamage / 75) * 35, 5), 40, 80);
+    return clamp(
+      roundToStep(
+          template.dodge.normalMpCost +
+          template.dodge.counterExtraBaseCost +
+          (dodge.counterDamage / template.dodge.counterDamageMax) * template.dodge.counterCostAtMax,
+        template.dodge.mpStep,
+      ),
+      template.dodge.counterMinMpCost,
+      template.dodge.counterMaxMpCost,
+    );
   }
-  return 25;
+  return template.dodge.normalMpCost;
 }
 
-function dodgeRetreatDistance(dodge: DodgeDraft) {
-  return dodge.mode === "double_retreat" ? 200 : 100;
+function dodgeRetreatDistance(dodge: DodgeDraft, template: SeasonTemplate) {
+  return dodge.mode === "double_retreat" ? template.dodge.doubleRetreatDistance : template.dodge.normalRetreatDistance;
 }
 
 function passiveValueLabel(passive: PassiveDraft, lang: Language) {
@@ -343,61 +377,56 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   const { i18n } = useTranslation();
   const lang: Language = i18n.language.startsWith("en") ? "en" : "zh";
   const t = copy[lang];
+  const [selectedSeasonId, setSelectedSeasonId] = useState<SeasonId>("S1");
+  const seasonTemplate = useMemo(() => getSeasonTemplate(selectedSeasonId), [selectedSeasonId]);
+  const seasonDraft = seasonTemplate.draftDefaults[lang];
 
-  const [projectName, setProjectName] = useState(lang === "en" ? "Origin Project" : "起源项目");
-  const [characterName, setCharacterName] = useState(lang === "en" ? "Origin Fighter" : "起源斗士");
+  const [projectName, setProjectName] = useState(seasonDraft.projectName);
+  const [characterName, setCharacterName] = useState(seasonDraft.characterName);
   const [creator, setCreator] = useState("creator_name");
-  const [description, setDescription] = useState(
-    lang === "en"
-      ? "A balanced S1 prototype character prepared for simulation and AI training."
-      : "用于 S1 起源赛季模拟与 AI 训练的均衡型角色。",
-  );
-  const [trainingNotes, setTrainingNotes] = useState(
-    lang === "en"
-      ? "Preferred behavior, combo ideas, weaknesses, and style notes can be written here."
-      : "这里填写期望行为、连招思路、弱点、战斗风格和训练要求。",
-  );
+  const [description, setDescription] = useState(seasonDraft.description);
+  const [trainingNotes, setTrainingNotes] = useState(seasonDraft.trainingNotes);
   const [portrait, setPortrait] = useState<PortraitDraft>({
     fileName: "",
     mimeType: "",
     dataUrl: "",
   });
-  const hp = 500;
-  const mp = 250;
+  const hp = seasonTemplate.characterDefaults.hp;
+  const mp = seasonTemplate.characterDefaults.mp;
   const [activeSkill, setActiveSkill] = useState<SkillKind>("basic");
-  const [basic, setBasic] = useState<BasicDraft>({ maxMpSpend: 30 });
+  const [basic, setBasic] = useState<BasicDraft>({ maxMpSpend: seasonTemplate.skillDefaults.basic.maxMpSpend });
   const [melee, setMelee] = useState<MeleeDraft>({
-    id: "origin_fighter_melee",
-    name: "Origin Slash",
+    id: seasonTemplate.skillDefaults.melee.id,
+    name: seasonTemplate.skillDefaults.melee.name,
     mode: "damage",
-    mpCost: 0,
-    damage: 25,
+    mpCost: seasonTemplate.skillDefaults.melee.mpCost,
+    damage: seasonTemplate.skillDefaults.melee.damage,
     debuffName: "",
     debuffEffect: "",
   });
   const [ranged, setRanged] = useState<RangedDraft>({
-    id: "origin_fighter_ranged",
-    name: "Origin Bolt",
-    damage: 75,
-    hitRate: 0.6,
-    range: 100,
+    id: seasonTemplate.skillDefaults.ranged.id,
+    name: seasonTemplate.skillDefaults.ranged.name,
+    damage: seasonTemplate.skillDefaults.ranged.damage,
+    hitRate: seasonTemplate.skillDefaults.ranged.hitRate,
+    range: seasonTemplate.skillDefaults.ranged.range,
   });
   const [block, setBlock] = useState<BlockDraft>({
-    id: "origin_fighter_block",
-    name: "Origin Guard",
-    damageReduction: 0.5,
+    id: seasonTemplate.skillDefaults.block.id,
+    name: seasonTemplate.skillDefaults.block.name,
+    damageReduction: seasonTemplate.block.defaultReduction,
     perfectCounter: false,
-    counterDamage: 25,
+    counterDamage: seasonTemplate.skillDefaults.block.counterDamage,
   });
   const [dodge, setDodge] = useState<DodgeDraft>({
-    id: "origin_fighter_dodge",
-    name: "Origin Dodge",
+    id: seasonTemplate.skillDefaults.dodge.id,
+    name: seasonTemplate.skillDefaults.dodge.name,
     mode: "normal",
-    counterDamage: 25,
+    counterDamage: seasonTemplate.skillDefaults.dodge.counterDamage,
   });
   const [passive, setPassive] = useState<PassiveDraft>({
-    id: "origin_fighter_passive",
-    name: "Origin Passive",
+    id: seasonTemplate.skillDefaults.passive.id,
+    name: seasonTemplate.skillDefaults.passive.name,
     mode: "none",
     effectCategory: "",
     effectName: "",
@@ -409,11 +438,66 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   });
   const [status, setStatus] = useState("");
 
+  const applySeasonTemplate = (seasonId: SeasonId) => {
+    const nextTemplate = getSeasonTemplate(seasonId);
+    const nextDraft = nextTemplate.draftDefaults[lang];
+
+    setSelectedSeasonId(nextTemplate.id);
+    setProjectName(nextDraft.projectName);
+    setCharacterName(nextDraft.characterName);
+    setDescription(nextDraft.description);
+    setTrainingNotes(nextDraft.trainingNotes);
+    setBasic({ maxMpSpend: nextTemplate.skillDefaults.basic.maxMpSpend });
+    setMelee({
+      id: nextTemplate.skillDefaults.melee.id,
+      name: nextTemplate.skillDefaults.melee.name,
+      mode: "damage",
+      mpCost: nextTemplate.skillDefaults.melee.mpCost,
+      damage: nextTemplate.skillDefaults.melee.damage,
+      debuffName: "",
+      debuffEffect: "",
+    });
+    setRanged({
+      id: nextTemplate.skillDefaults.ranged.id,
+      name: nextTemplate.skillDefaults.ranged.name,
+      damage: nextTemplate.skillDefaults.ranged.damage,
+      hitRate: nextTemplate.skillDefaults.ranged.hitRate,
+      range: nextTemplate.skillDefaults.ranged.range,
+    });
+    setBlock({
+      id: nextTemplate.skillDefaults.block.id,
+      name: nextTemplate.skillDefaults.block.name,
+      damageReduction: nextTemplate.block.defaultReduction,
+      perfectCounter: false,
+      counterDamage: nextTemplate.skillDefaults.block.counterDamage,
+    });
+    setDodge({
+      id: nextTemplate.skillDefaults.dodge.id,
+      name: nextTemplate.skillDefaults.dodge.name,
+      mode: "normal",
+      counterDamage: nextTemplate.skillDefaults.dodge.counterDamage,
+    });
+    setPassive({
+      id: nextTemplate.skillDefaults.passive.id,
+      name: nextTemplate.skillDefaults.passive.name,
+      mode: "none",
+      effectCategory: "",
+      effectName: "",
+      triggerCondition: "",
+      value: "",
+      valueUnit: "",
+      effectDescription: "",
+      description: "",
+    });
+    setActiveSkill("basic");
+    setStatus("");
+  };
+
   const resourceId = normalizeId(`${projectName}_${characterName}`);
-  const rangedCost = rangedMpCost(ranged);
-  const blockCost = blockMpCost(block);
-  const dodgeCost = dodgeMpCost(dodge);
-  const dodgeRetreat = dodgeRetreatDistance(dodge);
+  const rangedCost = rangedMpCost(ranged, seasonTemplate);
+  const blockCost = blockMpCost(block, seasonTemplate);
+  const dodgeCost = dodgeMpCost(dodge, seasonTemplate);
+  const dodgeRetreat = dodgeRetreatDistance(dodge, seasonTemplate);
   const passiveResource = useMemo(() => {
     if (passive.mode === "none") {
       return null;
@@ -486,11 +570,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     () => ({
       basic_attack: {
         type: "basic_attack",
-        base_damage: 10,
+        base_damage: seasonTemplate.basicAttack.baseDamage,
         max_mp_spend: basic.maxMpSpend,
-        mp_step: 5,
-        damage_range: [10, 40],
-        damage_table: Object.entries(basicDamageTable).map(([mpSpend, damage]) => ({
+        mp_step: seasonTemplate.basicAttack.mpStep,
+        damage_range: seasonTemplate.basicAttack.damageRange,
+        damage_table: Object.entries(seasonTemplate.basicAttack.damageTable).map(([mpSpend, damage]) => ({
           mp_spend: Number(mpSpend),
           damage,
         })),
@@ -500,15 +584,15 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         id: normalizeId(melee.id),
         name: melee.name.trim(),
         type: "melee",
-        range: 10,
-        cone_angle_degrees: 120,
+        range: seasonTemplate.melee.range,
+        cone_angle_degrees: seasonTemplate.melee.coneAngleDegrees,
         mode: melee.mode,
         mp_cost: melee.mpCost,
-        base_damage: 25,
-        damage: melee.mode === "damage" ? melee.damage : 25,
-        damage_range: [10, 75],
-        mp_range: [0, 50],
-        mp_step: 5,
+        base_damage: seasonTemplate.melee.baseDamage,
+        damage: melee.mode === "damage" ? melee.damage : seasonTemplate.melee.baseDamage,
+        damage_range: [seasonTemplate.melee.minDamage, seasonTemplate.melee.maxDamage],
+        mp_range: [seasonTemplate.melee.minMpCost, seasonTemplate.melee.maxMpCost],
+        mp_step: seasonTemplate.melee.mpStep,
         debuff:
           melee.mode === "debuff"
             ? {
@@ -528,7 +612,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         hit_rate: ranged.hitRate,
         range: ranged.range,
         ai_locked_design: true,
-        cost_curve: "round5(clamp(50 + damage_delta + hit_delta + range_delta + 5_per_boosted_attribute, 25, 100))",
+        cost_curve: "season_template_ranged_curve",
       },
       block: {
         id: normalizeId(block.id),
@@ -569,7 +653,19 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       },
       passive: passiveResource,
     }),
-    [basic.maxMpSpend, block, blockCost, dodge, dodgeCost, dodgeRetreat, melee, passiveResource, ranged, rangedCost],
+    [
+      basic.maxMpSpend,
+      block,
+      blockCost,
+      dodge,
+      dodgeCost,
+      dodgeRetreat,
+      melee,
+      passiveResource,
+      ranged,
+      rangedCost,
+      seasonTemplate,
+    ],
   );
 
   const skillResources = useMemo(
@@ -579,11 +675,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         name: melee.name.trim(),
         type: "melee",
         mp_cost: melee.mpCost,
-        damage: melee.mode === "damage" ? melee.damage : 25,
-        min_mp_cost: 0,
-        max_mp_cost: 50,
-        min_damage: 10,
-        max_damage: 75,
+        damage: melee.mode === "damage" ? melee.damage : seasonTemplate.melee.baseDamage,
+        min_mp_cost: seasonTemplate.melee.minMpCost,
+        max_mp_cost: seasonTemplate.melee.maxMpCost,
+        min_damage: seasonTemplate.melee.minDamage,
+        max_damage: seasonTemplate.melee.maxDamage,
       },
       {
         id: normalizeId(ranged.id),
@@ -594,16 +690,16 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         hit_rate: ranged.hitRate,
         range: ranged.range,
         knockback: 0,
-        min_mp_cost: 25,
-        max_mp_cost: 100,
-        min_damage: 25,
-        max_damage: 150,
-        min_hit_rate: 0.6,
-        max_hit_rate: 1.0,
-        min_range: 100,
-        max_range: 200,
+        min_mp_cost: seasonTemplate.ranged.minMpCost,
+        max_mp_cost: seasonTemplate.ranged.maxMpCost,
+        min_damage: seasonTemplate.ranged.minDamage,
+        max_damage: seasonTemplate.ranged.maxDamage,
+        min_hit_rate: seasonTemplate.ranged.minHitRate,
+        max_hit_rate: seasonTemplate.ranged.maxHitRate,
+        min_range: seasonTemplate.ranged.minRange,
+        max_range: seasonTemplate.ranged.maxRange,
         min_knockback: 0,
-        max_knockback: 100,
+        max_knockback: seasonTemplate.ranged.maxKnockback,
       },
       {
         id: normalizeId(block.id),
@@ -611,7 +707,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         type: "block",
         mp_cost: blockCost,
         damage_reduction: block.damageReduction,
-        max_damage_reduction: 0.75,
+        max_damage_reduction: seasonTemplate.block.maxReduction,
       },
       {
         id: normalizeId(dodge.id),
@@ -621,7 +717,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         retreat_distance: dodgeRetreat,
       },
     ],
-    [block, blockCost, dodge.id, dodgeCost, dodgeRetreat, melee, ranged, rangedCost],
+    [block, blockCost, dodge.id, dodgeCost, dodgeRetreat, melee, ranged, rangedCost, seasonTemplate],
   );
 
   const infoPackage = useMemo(
@@ -630,8 +726,14 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       file_extension: ".ucechar",
       schema_version: CHARACTER_SCHEMA_VERSION,
       engine_version: UCE_VERSION,
-      target_season: "S1",
-      ruleset_version: S1_RULESET_VERSION,
+      target_season: seasonTemplate.id,
+      ruleset_version: seasonTemplate.rulesetVersion,
+      season_template: {
+        id: seasonTemplate.id,
+        name: seasonTemplate.name,
+        ruleset_version: seasonTemplate.rulesetVersion,
+        character_defaults: seasonTemplate.characterDefaults,
+      },
       generated_by: "Ultra Confrontation Engine",
       submission: {
         status: "player_draft",
@@ -648,7 +750,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         notes: trainingNotes.trim(),
       },
     }),
-    [characterResource, combatDesign, passiveResource, skillResources, trainingNotes],
+    [characterResource, combatDesign, passiveResource, seasonTemplate, skillResources, trainingNotes],
   );
 
   const validationIssues = useMemo(() => {
@@ -670,11 +772,19 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     if (characterResource.creator.length === 0) {
       issues.push(lang === "en" ? "Creator cannot be empty." : "作者不能为空。");
     }
-    if (hp !== 500) {
-      issues.push(lang === "en" ? "S1 HP is fixed at 500." : "S1 生命固定为 500。");
+    if (hp !== seasonTemplate.characterDefaults.hp) {
+      issues.push(
+        lang === "en"
+          ? `${seasonTemplate.id} HP is fixed at ${seasonTemplate.characterDefaults.hp}.`
+          : `${seasonTemplate.id} 生命固定为 ${seasonTemplate.characterDefaults.hp}。`,
+      );
     }
-    if (mp !== 250) {
-      issues.push(lang === "en" ? "S1 MP is fixed at 250." : "S1 能量固定为 250。");
+    if (mp !== seasonTemplate.characterDefaults.mp) {
+      issues.push(
+        lang === "en"
+          ? `${seasonTemplate.id} MP is fixed at ${seasonTemplate.characterDefaults.mp}.`
+          : `${seasonTemplate.id} 能量固定为 ${seasonTemplate.characterDefaults.mp}。`,
+      );
     }
     if (uniqueIds.size !== ids.length) {
       issues.push(lang === "en" ? "Character and skill IDs must be unique." : "角色和技能 ID 不能重复。");
@@ -706,17 +816,40 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       }
     }
 
-    if (!isFiveStep(basic.maxMpSpend) || basic.maxMpSpend < 0 || basic.maxMpSpend > 30) {
-      issues.push(lang === "en" ? "Basic attack MP spend must be 0-30 in steps of 5." : "平A附带蓝量必须是 0-30，且以 5 为单位。");
+    if (
+      !isStep(basic.maxMpSpend, seasonTemplate.basicAttack.mpStep) ||
+      basic.maxMpSpend < seasonTemplate.basicAttack.minMpSpend ||
+      basic.maxMpSpend > seasonTemplate.basicAttack.maxMpSpend
+    ) {
+      issues.push(
+        lang === "en"
+          ? `Basic attack MP spend must be ${seasonTemplate.basicAttack.minMpSpend}-${seasonTemplate.basicAttack.maxMpSpend} in steps of ${seasonTemplate.basicAttack.mpStep}.`
+          : `平A附带蓝量必须是 ${seasonTemplate.basicAttack.minMpSpend}-${seasonTemplate.basicAttack.maxMpSpend}，且以 ${seasonTemplate.basicAttack.mpStep} 为单位。`,
+      );
     }
-    if (!isFiveStep(melee.mpCost) || melee.mpCost < 0 || melee.mpCost > 50) {
-      issues.push(lang === "en" ? "Melee MP must be 0-50 in steps of 5." : "近战耗蓝必须是 0-50，且以 5 为单位。");
+    if (
+      !isStep(melee.mpCost, seasonTemplate.melee.mpStep) ||
+      melee.mpCost < seasonTemplate.melee.minMpCost ||
+      melee.mpCost > seasonTemplate.melee.maxMpCost
+    ) {
+      issues.push(
+        lang === "en"
+          ? `Melee MP must be ${seasonTemplate.melee.minMpCost}-${seasonTemplate.melee.maxMpCost} in steps of ${seasonTemplate.melee.mpStep}.`
+          : `近战耗蓝必须是 ${seasonTemplate.melee.minMpCost}-${seasonTemplate.melee.maxMpCost}，且以 ${seasonTemplate.melee.mpStep} 为单位。`,
+      );
     }
     if (melee.name.trim().length === 0) {
       issues.push(lang === "en" ? "Melee skill name cannot be empty." : "近战技能名不能为空。");
     }
-    if (melee.mode === "damage" && (melee.damage < 10 || melee.damage > 75)) {
-      issues.push(lang === "en" ? "Melee damage must be between 10 and 75." : "近战伤害必须在 10 到 75 之间。");
+    if (
+      melee.mode === "damage" &&
+      (melee.damage < seasonTemplate.melee.minDamage || melee.damage > seasonTemplate.melee.maxDamage)
+    ) {
+      issues.push(
+        lang === "en"
+          ? `Melee damage must be between ${seasonTemplate.melee.minDamage} and ${seasonTemplate.melee.maxDamage}.`
+          : `近战伤害必须在 ${seasonTemplate.melee.minDamage} 到 ${seasonTemplate.melee.maxDamage} 之间。`,
+      );
     }
     if (melee.mode === "debuff") {
       if (melee.mpCost <= 0) {
@@ -729,33 +862,79 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     if (ranged.name.trim().length === 0) {
       issues.push(lang === "en" ? "Ranged skill name cannot be empty." : "远程技能名不能为空。");
     }
-    if (ranged.damage < 25 || ranged.damage > 150) {
-      issues.push(lang === "en" ? "Ranged damage must be between 25 and 150." : "远程伤害必须在 25 到 150 之间。");
+    if (ranged.damage < seasonTemplate.ranged.minDamage || ranged.damage > seasonTemplate.ranged.maxDamage) {
+      issues.push(
+        lang === "en"
+          ? `Ranged damage must be between ${seasonTemplate.ranged.minDamage} and ${seasonTemplate.ranged.maxDamage}.`
+          : `远程伤害必须在 ${seasonTemplate.ranged.minDamage} 到 ${seasonTemplate.ranged.maxDamage} 之间。`,
+      );
     }
-    if (ranged.hitRate < 0.6 || ranged.hitRate > 1) {
-      issues.push(lang === "en" ? "Ranged hit rate must be between 60% and 100%." : "远程命中率必须在 60% 到 100% 之间。");
+    if (ranged.hitRate < seasonTemplate.ranged.minHitRate || ranged.hitRate > seasonTemplate.ranged.maxHitRate) {
+      issues.push(
+        lang === "en"
+          ? `Ranged hit rate must be between ${Math.round(seasonTemplate.ranged.minHitRate * 100)}% and ${Math.round(seasonTemplate.ranged.maxHitRate * 100)}%.`
+          : `远程命中率必须在 ${Math.round(seasonTemplate.ranged.minHitRate * 100)}% 到 ${Math.round(seasonTemplate.ranged.maxHitRate * 100)}% 之间。`,
+      );
     }
-    if (ranged.range < 100 || ranged.range > 200) {
-      issues.push(lang === "en" ? "Ranged range must be between 100 and 200." : "远程射程必须在 100 到 200 之间。");
+    if (ranged.range < seasonTemplate.ranged.minRange || ranged.range > seasonTemplate.ranged.maxRange) {
+      issues.push(
+        lang === "en"
+          ? `Ranged range must be between ${seasonTemplate.ranged.minRange} and ${seasonTemplate.ranged.maxRange}.`
+          : `远程射程必须在 ${seasonTemplate.ranged.minRange} 到 ${seasonTemplate.ranged.maxRange} 之间。`,
+      );
     }
     if (block.name.trim().length === 0) {
       issues.push(lang === "en" ? "Block skill name cannot be empty." : "格挡技能名不能为空。");
     }
-    if (block.damageReduction < 0.5 || block.damageReduction > 0.75) {
-      issues.push(lang === "en" ? "Block reduction must be between 50% and 75%." : "格挡减伤必须在 50% 到 75% 之间。");
+    if (block.damageReduction < seasonTemplate.block.minReduction || block.damageReduction > seasonTemplate.block.maxReduction) {
+      issues.push(
+        lang === "en"
+          ? `Block reduction must be between ${Math.round(seasonTemplate.block.minReduction * 100)}% and ${Math.round(seasonTemplate.block.maxReduction * 100)}%.`
+          : `格挡减伤必须在 ${Math.round(seasonTemplate.block.minReduction * 100)}% 到 ${Math.round(seasonTemplate.block.maxReduction * 100)}% 之间。`,
+      );
     }
-    if (block.perfectCounter && (block.counterDamage < 10 || block.counterDamage > 75)) {
-      issues.push(lang === "en" ? "Perfect guard counter damage must be 10-75." : "完美格挡反击伤害必须在 10 到 75 之间。");
+    if (
+      block.perfectCounter &&
+      (block.counterDamage < seasonTemplate.block.counterDamageMin ||
+        block.counterDamage > seasonTemplate.block.counterDamageMax)
+    ) {
+      issues.push(
+        lang === "en"
+          ? `Perfect guard counter damage must be ${seasonTemplate.block.counterDamageMin}-${seasonTemplate.block.counterDamageMax}.`
+          : `完美格挡反击伤害必须在 ${seasonTemplate.block.counterDamageMin} 到 ${seasonTemplate.block.counterDamageMax} 之间。`,
+      );
     }
     if (dodge.name.trim().length === 0) {
       issues.push(lang === "en" ? "Dodge skill name cannot be empty." : "闪避技能名不能为空。");
     }
-    if (dodge.mode === "counter" && (dodge.counterDamage < 10 || dodge.counterDamage > 75)) {
-      issues.push(lang === "en" ? "Dodge counter damage must be 10-75." : "闪避反击伤害必须在 10 到 75 之间。");
+    if (
+      dodge.mode === "counter" &&
+      (dodge.counterDamage < seasonTemplate.dodge.counterDamageMin ||
+        dodge.counterDamage > seasonTemplate.dodge.counterDamageMax)
+    ) {
+      issues.push(
+        lang === "en"
+          ? `Dodge counter damage must be ${seasonTemplate.dodge.counterDamageMin}-${seasonTemplate.dodge.counterDamageMax}.`
+          : `闪避反击伤害必须在 ${seasonTemplate.dodge.counterDamageMin} 到 ${seasonTemplate.dodge.counterDamageMax} 之间。`,
+      );
     }
 
     return issues;
-  }, [basic, block, characterResource, dodge, hp, lang, melee, mp, passive, projectName, ranged, resourceId]);
+  }, [
+    basic,
+    block,
+    characterResource,
+    dodge,
+    hp,
+    lang,
+    melee,
+    mp,
+    passive,
+    projectName,
+    ranged,
+    resourceId,
+    seasonTemplate,
+  ]);
 
   const previewPackage = useMemo(
     () => ({
@@ -870,20 +1049,22 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.maxMpSpend}</span>
               <input
                 type="number"
-                min="0"
-                max="30"
-                step="5"
+                min={seasonTemplate.basicAttack.minMpSpend}
+                max={seasonTemplate.basicAttack.maxMpSpend}
+                step={seasonTemplate.basicAttack.mpStep}
                 value={basic.maxMpSpend}
-                onChange={(e) => setBasic({ maxMpSpend: numberInput(Number(e.target.value), 30) })}
+                onChange={(e) =>
+                  setBasic({ maxMpSpend: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.basic.maxMpSpend) })
+                }
               />
             </label>
             <div className="creator-derived">
               <span>{t.damage}</span>
-              <strong>{basicDamage(basic.maxMpSpend)}</strong>
+              <strong>{basicDamage(basic.maxMpSpend, seasonTemplate)}</strong>
             </div>
           </div>
           <div className="creator-mini-table">
-            {Object.entries(basicDamageTable).map(([mpSpend, damage]) => (
+            {Object.entries(seasonTemplate.basicAttack.damageTable).map(([mpSpend, damage]) => (
               <span key={mpSpend}>
                 {mpSpend} MP / {damage} DMG
               </span>
@@ -926,9 +1107,9 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.mpCost}</span>
               <input
                 type="number"
-                min="0"
-                max="50"
-                step="5"
+                min={seasonTemplate.melee.minMpCost}
+                max={seasonTemplate.melee.maxMpCost}
+                step={seasonTemplate.melee.mpStep}
                 value={melee.mpCost}
                 onChange={(e) => setMelee((current) => ({ ...current, mpCost: numberInput(Number(e.target.value)) }))}
               />
@@ -938,10 +1119,15 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
                 <span>{t.damage}</span>
                 <input
                   type="number"
-                  min="10"
-                  max="75"
+                  min={seasonTemplate.melee.minDamage}
+                  max={seasonTemplate.melee.maxDamage}
                   value={melee.damage}
-                  onChange={(e) => setMelee((current) => ({ ...current, damage: numberInput(Number(e.target.value), 25) }))}
+                  onChange={(e) =>
+                    setMelee((current) => ({
+                      ...current,
+                      damage: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.melee.damage),
+                    }))
+                  }
                 />
               </label>
             ) : (
@@ -985,22 +1171,30 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.damage}</span>
               <input
                 type="number"
-                min="25"
-                max="150"
+                min={seasonTemplate.ranged.minDamage}
+                max={seasonTemplate.ranged.maxDamage}
                 value={ranged.damage}
-                onChange={(e) => setRanged((current) => ({ ...current, damage: numberInput(Number(e.target.value), 75) }))}
+                onChange={(e) =>
+                  setRanged((current) => ({
+                    ...current,
+                    damage: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.ranged.damage),
+                  }))
+                }
               />
             </label>
             <label>
               <span>{t.hitRate}</span>
               <input
                 type="number"
-                min="60"
-                max="100"
+                min={Math.round(seasonTemplate.ranged.minHitRate * 100)}
+                max={Math.round(seasonTemplate.ranged.maxHitRate * 100)}
                 step="0.1"
                 value={Math.round(ranged.hitRate * 100)}
                 onChange={(e) =>
-                  setRanged((current) => ({ ...current, hitRate: numberInput(Number(e.target.value), 60) / 100 }))
+                  setRanged((current) => ({
+                    ...current,
+                    hitRate: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.ranged.hitRate * 100) / 100,
+                  }))
                 }
               />
             </label>
@@ -1008,10 +1202,15 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.range}</span>
               <input
                 type="number"
-                min="100"
-                max="200"
+                min={seasonTemplate.ranged.minRange}
+                max={seasonTemplate.ranged.maxRange}
                 value={ranged.range}
-                onChange={(e) => setRanged((current) => ({ ...current, range: numberInput(Number(e.target.value), 100) }))}
+                onChange={(e) =>
+                  setRanged((current) => ({
+                    ...current,
+                    range: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.ranged.range),
+                  }))
+                }
               />
             </label>
             <div className="creator-derived">
@@ -1040,14 +1239,14 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.reduction}</span>
               <input
                 type="number"
-                min="50"
-                max="75"
+                min={Math.round(seasonTemplate.block.minReduction * 100)}
+                max={Math.round(seasonTemplate.block.maxReduction * 100)}
                 step="1"
                 value={Math.round(block.damageReduction * 100)}
                 onChange={(e) =>
                   setBlock((current) => ({
                     ...current,
-                    damageReduction: numberInput(Number(e.target.value), 50) / 100,
+                    damageReduction: numberInput(Number(e.target.value), seasonTemplate.block.defaultReduction * 100) / 100,
                   }))
                 }
               />
@@ -1069,11 +1268,14 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
                 <span>{t.counterDamage}</span>
                 <input
                   type="number"
-                  min="10"
-                  max="75"
+                  min={seasonTemplate.block.counterDamageMin}
+                  max={seasonTemplate.block.counterDamageMax}
                   value={block.counterDamage}
                   onChange={(e) =>
-                    setBlock((current) => ({ ...current, counterDamage: numberInput(Number(e.target.value), 25) }))
+                    setBlock((current) => ({
+                      ...current,
+                      counterDamage: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.block.counterDamage),
+                    }))
                   }
                 />
               </label>
@@ -1232,11 +1434,14 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
               <span>{t.counterDamage}</span>
               <input
                 type="number"
-                min="10"
-                max="75"
+                min={seasonTemplate.dodge.counterDamageMin}
+                max={seasonTemplate.dodge.counterDamageMax}
                 value={dodge.counterDamage}
                 onChange={(e) =>
-                  setDodge((current) => ({ ...current, counterDamage: numberInput(Number(e.target.value), 25) }))
+                  setDodge((current) => ({
+                    ...current,
+                    counterDamage: numberInput(Number(e.target.value), seasonTemplate.skillDefaults.dodge.counterDamage),
+                  }))
                 }
               />
             </label>
@@ -1263,6 +1468,29 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
           <div className="creator-column creator-form-column">
             <section className="creator-section">
               <div className="creator-section-title">{t.identity}</div>
+              <div className="creator-season-template">
+                <div>
+                  <span>{t.seasonTemplate}</span>
+                  <strong>{seasonTemplate.name[lang]}</strong>
+                  <em>{t.templateRuleset}: {seasonTemplate.rulesetVersion}</em>
+                </div>
+                <div className="creator-season-options" role="group" aria-label={t.seasonTemplate}>
+                  {seasonTemplates.map((template) => (
+                    <button
+                      className={
+                        template.id === selectedSeasonId
+                          ? "creator-season-option creator-season-option-active"
+                          : "creator-season-option"
+                      }
+                      key={template.id}
+                      type="button"
+                      onClick={() => applySeasonTemplate(template.id)}
+                    >
+                      {template.id}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="creator-grid">
                 <label>
                   <span>{t.projectName}</span>

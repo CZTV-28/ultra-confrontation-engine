@@ -112,6 +112,14 @@ interface OfficialImportPackage {
   };
 }
 
+interface OfficialAssetsDraft {
+  character: CharacterResource | null;
+  skills: SkillResource[];
+  passive: unknown;
+  combat_design: unknown;
+  training: unknown;
+}
+
 interface OfficialImportResult {
   character_id: string;
   skill_ids: string[];
@@ -142,6 +150,10 @@ const copy = {
     passive: "被动技能",
     training: "训练备注",
     officialPreview: "官方资源预览",
+    officialAssetsEditor: "官方资源编辑",
+    officialAssetsEditorHint: "这里是最终写入资源库的官方稿，可修改所有文字和数值。",
+    officialAssetsInvalid: "官方资源编辑稿不是合法 JSON。",
+    resetOfficialAssets: "重置官方稿",
     audit: "审核结果",
     canApprove: "基础规则通过",
     needsReview: "需要人工复核",
@@ -206,6 +218,10 @@ const copy = {
     passive: "Passive",
     training: "Training Notes",
     officialPreview: "Official Asset Preview",
+    officialAssetsEditor: "Official Resource Editor",
+    officialAssetsEditorHint: "This is the official draft that will be written to the asset library. Text and numeric values can be edited here.",
+    officialAssetsInvalid: "The official resource draft is not valid JSON.",
+    resetOfficialAssets: "Reset Official Draft",
     audit: "Review Result",
     canApprove: "Base Rules Passed",
     needsReview: "Manual Review Required",
@@ -356,6 +372,38 @@ function getOfficialSkills(officialPackage: OfficialImportPackage | null): Skill
   return skills.filter(isRecord) as SkillResource[];
 }
 
+function createOfficialAssetsDraft(submission: SubmissionPackage): OfficialAssetsDraft {
+  return {
+    character: submission.character ?? null,
+    skills: getSkills(submission),
+    passive: submission.passive ?? null,
+    combat_design: submission.combat_design ?? null,
+    training: submission.training ?? null,
+  };
+}
+
+function parseOfficialAssetsDraft(text: string): { draft: OfficialAssetsDraft | null; error: string } {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!isRecord(parsed)) {
+      return { draft: null, error: "not_object" };
+    }
+
+    return {
+      draft: {
+        character: isRecord(parsed.character) ? (parsed.character as CharacterResource) : null,
+        skills: Array.isArray(parsed.skills) ? (parsed.skills.filter(isRecord) as SkillResource[]) : [],
+        passive: Object.prototype.hasOwnProperty.call(parsed, "passive") ? parsed.passive : null,
+        combat_design: Object.prototype.hasOwnProperty.call(parsed, "combat_design") ? parsed.combat_design : null,
+        training: Object.prototype.hasOwnProperty.call(parsed, "training") ? parsed.training : null,
+      },
+      error: "",
+    };
+  } catch {
+    return { draft: null, error: "invalid_json" };
+  }
+}
+
 function isApprovedOfficialPackage(value: unknown): value is OfficialImportPackage {
   if (!isRecord(value)) {
     return false;
@@ -394,7 +442,11 @@ function isTypingTarget(target: EventTarget | null) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
 }
 
-function reviewSubmission(submission: SubmissionPackage, checksum: ChecksumStatus): ReviewItem[] {
+function reviewSubmission(
+  submission: SubmissionPackage,
+  checksum: ChecksumStatus,
+  options: { skipChecksum?: boolean } = {},
+): ReviewItem[] {
   const items: ReviewItem[] = [];
   const pass = (title: string, detail: string) => items.push({ severity: "pass", title, detail });
   const warning = (title: string, detail: string) => items.push({ severity: "warning", title, detail });
@@ -418,7 +470,9 @@ function reviewSubmission(submission: SubmissionPackage, checksum: ChecksumStatu
     warning("规则版本", "ruleset_version 不是 0.1.0，需要确认是否来自旧版或新版规则。");
   }
 
-  if (!checksum.available) {
+  if (options.skipChecksum) {
+    pass("官方草稿校验", "当前审核结果基于官方编辑草稿，原始投稿 checksum 仅保留在来源记录中。");
+  } else if (!checksum.available) {
     warning("SHA-256 校验", "文件没有携带 checksum，无法判断是否被手动改动。");
   } else if (checksum.matched) {
     pass("SHA-256 校验", "导出校验码与当前文件内容一致。");
@@ -628,6 +682,7 @@ function reviewSubmission(submission: SubmissionPackage, checksum: ChecksumStatu
 
 function buildOfficialBundle(
   submission: SubmissionPackage,
+  officialAssets: OfficialAssetsDraft,
   sourcePath: string,
   checksum: ChecksumStatus | null,
   items: ReviewItem[],
@@ -635,8 +690,8 @@ function buildOfficialBundle(
   officialNotes: string,
   rosterSlot: S1RosterSlot | null,
 ) {
-  const characterId = asString(submission.character?.id, "unknown_character");
-  const skills = getSkills(submission);
+  const characterId = asString(officialAssets.character?.id, "unknown_character");
+  const skills = officialAssets.skills;
   const errors = items.filter((item) => item.severity === "error").length;
   const warnings = items.filter((item) => item.severity === "warning").length;
   const baseStatus = errors > 0 ? "blocked" : warnings > 0 ? "manual_review_required" : "base_rules_passed";
@@ -678,14 +733,16 @@ function buildOfficialBundle(
     asset_targets: {
       character: `assets/characters/${characterId}.json`,
       skills: skills.map((skill) => `assets/skills/${asString(skill.id, "unknown_skill")}.json`),
-      passive: isRecord(submission.passive) ? `assets/passives/${asString(submission.passive.id, `${characterId}_passive`)}.json` : null,
+      passive: isRecord(officialAssets.passive)
+        ? `assets/passives/${asString(officialAssets.passive.id, `${characterId}_passive`)}.json`
+        : null,
     },
     official_assets: {
-      character: submission.character ?? null,
+      character: officialAssets.character,
       skills,
-      passive: submission.passive ?? null,
-      combat_design: submission.combat_design ?? null,
-      training: submission.training ?? null,
+      passive: officialAssets.passive,
+      combat_design: officialAssets.combat_design,
+      training: officialAssets.training,
     },
   };
 }
@@ -764,23 +821,57 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   const [selectedSlot, setSelectedSlot] = useState(1);
   const [officialDecision, setOfficialDecision] = useState<S1ReviewDecision>("pending");
   const [officialNotes, setOfficialNotes] = useState("");
+  const [officialAssetsDraftText, setOfficialAssetsDraftText] = useState("");
   const [officialPackage, setOfficialPackage] = useState<OfficialImportPackage | null>(null);
   const [officialPackagePath, setOfficialPackagePath] = useState("");
   const [overwriteAssets, setOverwriteAssets] = useState(false);
   const [officialImportResult, setOfficialImportResult] = useState<OfficialImportResult | null>(null);
   const [officialImportError, setOfficialImportError] = useState("");
 
-  const errors = items.filter((item) => item.severity === "error").length;
-  const warnings = items.filter((item) => item.severity === "warning").length;
-  const passes = items.filter((item) => item.severity === "pass").length;
-  const reviewState = errors > 0 ? "blocked" : warnings > 0 ? "needsReview" : "canApprove";
-  const character = submission?.character;
-  const characterId = asString(character?.id);
-  const skills = submission ? getSkills(submission) : [];
-  const passive = isRecord(submission?.passive) ? submission.passive : null;
-  const training = isRecord(submission?.training) ? submission.training : null;
   const officialPackageCharacter = officialPackage?.official_assets?.character;
   const officialPackageSkills = getOfficialSkills(officialPackage);
+  const officialAssetsDraftState = useMemo(
+    () => (officialAssetsDraftText ? parseOfficialAssetsDraft(officialAssetsDraftText) : { draft: null, error: "" }),
+    [officialAssetsDraftText],
+  );
+  const officialAssetsDraft = officialAssetsDraftState.draft;
+  const officialAssetsDraftError = officialAssetsDraftState.error;
+  const officialAssetsView = officialAssetsDraft ?? (submission ? createOfficialAssetsDraft(submission) : null);
+  const character = officialAssetsView?.character ?? null;
+  const characterId = asString(character?.id);
+  const skills = officialAssetsView?.skills ?? [];
+  const passive = isRecord(officialAssetsView?.passive) ? officialAssetsView.passive : null;
+  const training = isRecord(officialAssetsView?.training) ? officialAssetsView.training : null;
+  const officialReviewSubmission = useMemo<SubmissionPackage | null>(
+    () =>
+      submission && officialAssetsDraft
+        ? {
+            ...submission,
+            character: officialAssetsDraft.character ?? undefined,
+            skills: officialAssetsDraft.skills,
+            passive: officialAssetsDraft.passive,
+            combat_design: officialAssetsDraft.combat_design,
+            training: officialAssetsDraft.training,
+          }
+        : null,
+    [officialAssetsDraft, submission],
+  );
+  const effectiveItems = useMemo(
+    () =>
+      officialReviewSubmission
+        ? reviewSubmission(officialReviewSubmission, {
+            available: false,
+            stored: "",
+            calculated: "",
+            matched: false,
+          }, { skipChecksum: true })
+        : items,
+    [items, officialReviewSubmission],
+  );
+  const errors = effectiveItems.filter((item) => item.severity === "error").length;
+  const warnings = effectiveItems.filter((item) => item.severity === "warning").length;
+  const passes = effectiveItems.filter((item) => item.severity === "pass").length;
+  const reviewState = errors > 0 ? "blocked" : warnings > 0 ? "needsReview" : "canApprove";
   const registeredRosterSlot = useMemo(
     () => findS1RosterSlot(roster, characterId) ?? null,
     [characterId, roster],
@@ -789,23 +880,40 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   const rosterStats = useMemo(() => getS1RosterStats(roster), [roster]);
   const selectedSlotOccupied = Boolean(selectedRosterSlot?.characterId.trim());
   const canApproveOfficial = errors === 0;
+  const canRegisterRoster = Boolean(
+    submission && officialAssetsDraft && !officialAssetsDraftError && isRecord(officialAssetsDraft.character),
+  );
 
   const officialBundle = useMemo(
     () =>
       submission
+      && officialAssetsDraft
         ? buildOfficialBundle(
             submission,
+            officialAssetsDraft,
             sourcePath,
             checksum,
-            items,
+            effectiveItems,
             officialDecision,
             officialNotes,
             registeredRosterSlot ?? selectedRosterSlot,
           )
         : null,
-    [checksum, items, officialDecision, officialNotes, registeredRosterSlot, selectedRosterSlot, sourcePath, submission],
+    [
+      checksum,
+      effectiveItems,
+      officialAssetsDraft,
+      officialDecision,
+      officialNotes,
+      registeredRosterSlot,
+      selectedRosterSlot,
+      sourcePath,
+      submission,
+    ],
   );
-  const canExportOfficialPackage = Boolean(officialDecision === "approved" && canApproveOfficial && officialBundle);
+  const canExportOfficialPackage = Boolean(
+    officialDecision === "approved" && canApproveOfficial && officialBundle && !officialAssetsDraftError,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -885,11 +993,13 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       const nextChecksum = await verifyChecksum(nextSubmission);
       const nextItems = reviewSubmission(nextSubmission, nextChecksum);
       const normalizedSubmission = await normalizeSubmissionPortrait(nextSubmission);
+      const nextOfficialAssetsDraft = createOfficialAssetsDraft(normalizedSubmission);
       const nextRoster = readS1Roster();
       const nextCharacterId = asString(nextSubmission.character?.id);
       const existingSlot = findS1RosterSlot(nextRoster, nextCharacterId);
 
       setSubmission(normalizedSubmission);
+      setOfficialAssetsDraftText(formatJson(nextOfficialAssetsDraft));
       setSourcePath(selectedPath);
       setChecksum(nextChecksum);
       setItems(nextItems);
@@ -900,12 +1010,14 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       setStatus("");
     } catch (error) {
       console.error(error);
+      setOfficialAssetsDraftText("");
       setStatus(t.importFailed);
     }
   };
 
   const registerRosterEntry = () => {
-    if (!submission) {
+    if (!submission || !officialAssetsDraft || officialAssetsDraftError) {
+      setStatus(t.officialAssetsInvalid);
       return;
     }
 
@@ -916,10 +1028,10 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
 
     const nextRoster = upsertS1RosterEntry({
       slot: selectedSlot,
-      characterId: asString(character?.id, "unknown_character"),
-      characterName: asString(character?.name, "Unnamed Character"),
-      projectName: asString(character?.project_name),
-      creator: asString(character?.creator, "Unknown Creator"),
+      characterId: asString(officialAssetsDraft.character?.id, "unknown_character"),
+      characterName: asString(officialAssetsDraft.character?.name, "Unnamed Character"),
+      projectName: asString(officialAssetsDraft.character?.project_name),
+      creator: asString(officialAssetsDraft.character?.creator, "Unknown Creator"),
       sourcePath,
       reviewDecision: officialDecision,
       officialNotes,
@@ -1000,7 +1112,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
     }
 
     try {
-      const characterId = asString(submission?.character?.id, "uce_character");
+      const characterId = asString(officialBundle.official_assets.character?.id, "uce_character");
       const { save } = await import("@tauri-apps/plugin-dialog");
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
       const selectedPath = await save({
@@ -1140,7 +1252,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
           </div>
           <div className="review-actions">
             <button type="button" onClick={importSubmission}>{t.import}</button>
-            <button type="button" onClick={registerRosterEntry} disabled={!submission}>{t.registerRoster}</button>
+            <button type="button" onClick={registerRosterEntry} disabled={!canRegisterRoster}>{t.registerRoster}</button>
             <button type="button" onClick={exportReviewBundle} disabled={!canExportOfficialPackage}>{t.export}</button>
             <button type="button" onClick={importOfficialPackage}>{t.importOfficial}</button>
             <button type="button" onClick={applyOfficialPackage} disabled={!officialPackage}>{t.applyOfficial}</button>
@@ -1215,7 +1327,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
                   />
                 </label>
 
-                <button className="review-register-button" type="button" onClick={registerRosterEntry}>
+                <button className="review-register-button" type="button" onClick={registerRosterEntry} disabled={!canRegisterRoster}>
                   {t.registerRoster}
                 </button>
                 {!canExportOfficialPackage && <p className="review-hint">{t.exportDisabledHint}</p>}
@@ -1245,7 +1357,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
               <section className="review-panel review-audit-panel">
                 <h2>{t.audit}</h2>
                 <div className="review-issue-list">
-                  {items.map((item, index) => (
+                  {effectiveItems.map((item, index) => (
                     <article className={`review-issue review-issue-${item.severity}`} key={`${item.title}-${index}`}>
                       <strong>{item.title}</strong>
                       <span>{item.detail}</span>
@@ -1298,6 +1410,30 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
               <section className="review-panel">
                 <h2>{t.assetTargets}</h2>
                 <pre>{officialBundle ? formatJson(officialBundle.asset_targets) : t.empty}</pre>
+              </section>
+
+              <section className="review-panel review-assets-editor">
+                <div className="review-panel-head">
+                  <div>
+                    <h2>{t.officialAssetsEditor}</h2>
+                    <p>{t.officialAssetsEditorHint}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      submission && setOfficialAssetsDraftText(formatJson(createOfficialAssetsDraft(submission)))
+                    }
+                    disabled={!submission}
+                  >
+                    {t.resetOfficialAssets}
+                  </button>
+                </div>
+                <textarea
+                  value={officialAssetsDraftText}
+                  onChange={(event) => setOfficialAssetsDraftText(event.target.value)}
+                  spellCheck={false}
+                />
+                {officialAssetsDraftError && <p className="review-hint">{t.officialAssetsInvalid}</p>}
               </section>
 
               <section className="review-panel review-preview">

@@ -1,0 +1,276 @@
+.tournament-battle-shell {
+  width: min(1340px, calc(100vw - 56px));
+  height: min(820px, calc(100vh - 46px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  color: #f7fbff;
+}
+
+.tournament-battle-header {
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  background:
+    linear-gradient(90deg, rgba(14, 8, 24, 0.94), rgba(28, 11, 34, 0.86)),
+    radial-gradient(circle at 22% 40%, rgba(255, 200, 87, 0.18), transparent 34%);
+  box-shadow:
+    0 0 22px rgba(255, 200, 87, 0.13),
+    inset 0 0 18px rgba(255, 255, 255, 0.04);
+}
+
+.tournament-battle-header p {
+  margin: 0 0 6px;
+  color: rgba(255, 218, 133, 0.88);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.tournament-battle-header h1 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, 0.5),
+    0 0 28px rgba(255, 200, 87, 0.28);
+}
+
+.tournament-battle-header button,
+.tournament-battle-start,
+.tournament-battle-match {
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background: rgba(4, 6, 18, 0.82);
+  color: #ffffff;
+  cursor: none;
+  font: inherit;
+}
+
+.tournament-battle-header button {
+  min-width: 132px;
+  min-height: 44px;
+}
+
+.tournament-battle-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(420px, 0.78fr) minmax(520px, 1.22fr);
+  gap: 18px;
+}
+
+.tournament-battle-panel {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background:
+    linear-gradient(180deg, rgba(7, 8, 20, 0.93), rgba(12, 6, 25, 0.88)),
+    radial-gradient(circle at 100% 0%, rgba(255, 200, 87, 0.14), transparent 34%);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.035),
+    0 0 22px rgba(0, 0, 0, 0.26);
+  padding: 18px;
+}
+
+.tournament-battle-section-title {
+  margin-bottom: 14px;
+  color: #ffffff;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.tournament-battle-module-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tournament-battle-module {
+  min-height: 48px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  border: 1px solid rgba(130, 213, 255, 0.28);
+  background: rgba(2, 4, 14, 0.58);
+  color: rgba(231, 246, 255, 0.8);
+  cursor: none;
+  font: inherit;
+  padding: 9px;
+  text-align: left;
+}
+
+.tournament-battle-module span {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tournament-battle-module strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tournament-battle-module-active {
+  border-color: rgba(255, 200, 87, 0.9);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.18), rgba(255, 104, 198, 0.12)),
+    rgba(4, 6, 18, 0.9);
+  box-shadow: 0 0 16px rgba(255, 200, 87, 0.13);
+}
+
+.tournament-battle-module:disabled {
+  opacity: 0.46;
+}
+
+.tournament-battle-match-list {
+  display: grid;
+  gap: 10px;
+}
+
+.tournament-battle-match {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.tournament-battle-match span,
+.tournament-battle-match em,
+.tournament-battle-versus span,
+.tournament-battle-versus em,
+.tournament-battle-versus small,
+.tournament-battle-meta {
+  color: rgba(208, 236, 255, 0.72);
+  font-style: normal;
+}
+
+.tournament-battle-match strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tournament-battle-match-active {
+  border-color: rgba(255, 200, 87, 0.9);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.2), rgba(255, 104, 198, 0.14)),
+    rgba(4, 6, 18, 0.9);
+  box-shadow: 0 0 18px rgba(255, 200, 87, 0.16);
+}
+
+.tournament-battle-control {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tournament-battle-versus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.tournament-battle-versus article {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(130, 213, 255, 0.26);
+  background: rgba(2, 4, 14, 0.64);
+}
+
+.tournament-battle-versus strong {
+  color: #ffffff;
+  font-size: clamp(20px, 2vw, 30px);
+  line-height: 1.12;
+  word-break: break-word;
+}
+
+.tournament-battle-versus b {
+  align-self: center;
+  color: rgba(255, 200, 87, 0.92);
+  font-size: 28px;
+  text-shadow: 0 0 16px rgba(255, 200, 87, 0.35);
+}
+
+.tournament-battle-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tournament-battle-meta span {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 10px;
+}
+
+.tournament-battle-start {
+  min-height: 48px;
+  border-color: rgba(255, 200, 87, 0.88);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.28), rgba(255, 104, 198, 0.18)),
+    rgba(4, 6, 18, 0.92);
+}
+
+.tournament-battle-start:disabled {
+  opacity: 0.48;
+}
+
+.tournament-battle-message,
+.tournament-battle-empty,
+.tournament-battle-result {
+  border: 1px solid rgba(130, 213, 255, 0.24);
+  background: rgba(2, 4, 14, 0.58);
+  padding: 14px;
+  color: rgba(231, 246, 255, 0.88);
+}
+
+.tournament-battle-result {
+  display: grid;
+  gap: 7px;
+}
+
+.tournament-battle-result strong {
+  color: #ffffff;
+  font-size: 26px;
+}
+
+.tournament-battle-result p {
+  margin: 0;
+  color: rgba(208, 236, 255, 0.72);
+}
+
+@media (max-width: 980px) {
+  .tournament-battle-shell {
+    width: calc(100vw - 28px);
+    height: calc(100vh - 30px);
+  }
+
+  .tournament-battle-layout,
+  .tournament-battle-versus {
+    grid-template-columns: 1fr;
+  }
+
+  .tournament-battle-module-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tournament-battle-versus b {
+    justify-self: center;
+  }
+}
