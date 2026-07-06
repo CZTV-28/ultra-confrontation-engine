@@ -6,6 +6,36 @@ The project uses SemVer-style versions during early development. While UCE is st
 
 ## [0.1.2] - 2026-07-06
 
+### Tournament System Refresh - 2026-07-07
+
+#### 中文
+
+- 优化了赛事系统，增加了可视化的对位表。
+- 优化了界面特效设计。
+- 优化了人物设计列表。
+- 优化了模拟对战。
+- 修复了若干 BUG。
+
+#### English
+
+- Optimized the tournament system and added a visual matchup bracket.
+- Improved UI effect design.
+- Improved the character design list.
+- Improved Battle Simulation.
+- Fixed several bugs.
+
+This section was translated with AI. Please forgive any errors.
+
+#### 日本語
+
+- トーナメントシステムを最適化し、視覚的な対戦表を追加しました。
+- UI エフェクトデザインを改善しました。
+- キャラクター設計リストを改善しました。
+- 模擬対戦を改善しました。
+- 複数の不具合を修正しました。
+
+この本文はAI翻訳を使用しています。誤りがある場合はご容赦ください。
+
 ### Developer Access Update
 
 #### 中文

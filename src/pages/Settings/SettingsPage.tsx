@@ -21,6 +21,8 @@ const copy = {
     instant: "立即完成",
     volume: "音量",
     volumeDesc: "预留给后续主界面配乐和战斗音效。",
+    effects: "全局特效强度",
+    effectsDesc: "控制通用窗口背景光效强弱。后续页面特效会逐步接入这个设置。",
     keys: "按键指南",
     keyRows: [
       ["↑↓ / WS", "选择"],
@@ -45,6 +47,8 @@ const copy = {
     instant: "Instant",
     volume: "Volume",
     volumeDesc: "Reserved for future home music and battle sound effects.",
+    effects: "Global Effects",
+    effectsDesc: "Controls shared window background effect intensity. More page effects will be connected later.",
     keys: "Key Guide",
     keyRows: [
       ["↑↓ / WS", "Select"],
@@ -68,7 +72,7 @@ function speedLabel(speed: number, instantLabel: string) {
 
 export default function SettingsPage({ goBack }: SettingsPageProps) {
   const { i18n } = useTranslation();
-  const { battleSpeed, volume, setBattleSpeed, setVolume } = useSettingsStore();
+  const { battleSpeed, volume, effectsIntensity, setBattleSpeed, setVolume, setEffectsIntensity } = useSettingsStore();
   const lang = i18n.language.startsWith("en") ? "en" : "zh";
   const t = copy[lang];
 
@@ -165,9 +169,33 @@ export default function SettingsPage({ goBack }: SettingsPageProps) {
             </div>
           </article>
 
-          <article className="settings-card settings-card-keys">
+          <article className="settings-card">
             <div className="settings-card-copy">
               <span>04</span>
+              <h2>{t.effects}</h2>
+              <p>{t.effectsDesc}</p>
+            </div>
+            <div className="settings-control">
+              <div className="settings-value">{effectsIntensity}%</div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={effectsIntensity}
+                onChange={(event) => setEffectsIntensity(Number(event.target.value))}
+                className="settings-slider"
+              />
+              <div className="settings-slider-scale">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="settings-card settings-card-keys">
+            <div className="settings-card-copy">
+              <span>05</span>
               <h2>{t.keys}</h2>
             </div>
             <div className="settings-key-grid">

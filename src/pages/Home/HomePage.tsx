@@ -31,6 +31,8 @@ type Page = "home" | "battle" | "creator" | "rules" | "review" | "trainer" | "re
 type SceneId = Page;
 type HomeMode = "participant" | "developer";
 
+const HOME_MODE_STORAGE_KEY = "uce_home_mode_v1";
+
 interface SceneTone {
   accent: [number, number, number];
   secondary: [number, number, number];
@@ -131,6 +133,29 @@ function isTypingTarget(target: EventTarget | null) {
   return target instanceof HTMLElement && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
 }
 
+function isHomeMode(value: string | null): value is HomeMode {
+  return value === "participant" || value === "developer";
+}
+
+function readInitialHomeMode(): HomeMode {
+  if (!readDeveloperSession()) {
+    return "participant";
+  }
+
+  if (typeof window === "undefined") {
+    return "developer";
+  }
+
+  const storedMode = window.sessionStorage.getItem(HOME_MODE_STORAGE_KEY);
+  return isHomeMode(storedMode) ? storedMode : "developer";
+}
+
+function rememberHomeMode(mode: HomeMode) {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(HOME_MODE_STORAGE_KEY, mode);
+  }
+}
+
 interface HomePageProps {
   navigateTo: (page: Page) => void;
   goBack: () => void;
@@ -193,7 +218,7 @@ function HomeEnglishLogoFragments() {
 
 export default function HomePage({ navigateTo }: HomePageProps) {
   const { i18n } = useTranslation();
-  const [homeMode, setHomeMode] = useState<HomeMode>("participant");
+  const [homeMode, setHomeMode] = useState<HomeMode>(() => readInitialHomeMode());
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [developerSession, setDeveloperSession] = useState<DeveloperSession | null>(() => readDeveloperSession());
   const [showDeveloperLogin, setShowDeveloperLogin] = useState(false);
@@ -291,6 +316,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
   );
 
   const enterParticipantMode = () => {
+    rememberHomeMode("participant");
     setHomeMode("participant");
     setShowDeveloperLogin(false);
     setLoginError("");
@@ -300,12 +326,14 @@ export default function HomePage({ navigateTo }: HomePageProps) {
     const activeSession = readDeveloperSession();
     if (activeSession) {
       setDeveloperSession(activeSession);
+      rememberHomeMode("developer");
       setHomeMode("developer");
       setShowDeveloperLogin(false);
       setLoginError("");
       return;
     }
 
+    rememberHomeMode("participant");
     setHomeMode("participant");
     setShowDeveloperLogin(true);
     setLoginError("");
@@ -319,6 +347,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
     }
 
     setDeveloperSession(session);
+    rememberHomeMode("developer");
     setHomeMode("developer");
     setShowDeveloperLogin(false);
     setDeveloperKey("");

@@ -1,0 +1,136 @@
+{
+  "season": "S1",
+  "name": "S1: Origin",
+  "format": "single_elimination_with_third_place",
+  "status": "preparing",
+  "capacity": 32,
+  "updatedAt": "2026-07-06T00:00:00+00:00",
+  "bracket": {
+    "left": [
+      {
+        "id": "left_round_of_32",
+        "title": {
+          "zh": "32强",
+          "en": "Round of 32"
+        },
+        "matches": [
+          { "id": "L-R32-01", "status": "pending", "slots": [1, 2], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-02", "status": "pending", "slots": [3, 4], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-03", "status": "pending", "slots": [5, 6], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-04", "status": "pending", "slots": [7, 8], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-05", "status": "pending", "slots": [9, 10], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-06", "status": "pending", "slots": [11, 12], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-07", "status": "pending", "slots": [13, 14], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R32-08", "status": "pending", "slots": [15, 16], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "left_round_of_16",
+        "title": {
+          "zh": "16强",
+          "en": "Round of 16"
+        },
+        "matches": [
+          { "id": "L-R16-01", "status": "pending", "sources": ["L-R32-01", "L-R32-02"], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R16-02", "status": "pending", "sources": ["L-R32-03", "L-R32-04"], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R16-03", "status": "pending", "sources": ["L-R32-05", "L-R32-06"], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-R16-04", "status": "pending", "sources": ["L-R32-07", "L-R32-08"], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "left_quarterfinal",
+        "title": {
+          "zh": "8强",
+          "en": "Quarterfinals"
+        },
+        "matches": [
+          { "id": "L-QF-01", "status": "pending", "sources": ["L-R16-01", "L-R16-02"], "winnerSlot": null, "loserSlot": null },
+          { "id": "L-QF-02", "status": "pending", "sources": ["L-R16-03", "L-R16-04"], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "left_semifinal",
+        "title": {
+          "zh": "4强",
+          "en": "Semifinals"
+        },
+        "matches": [
+          { "id": "L-SF-01", "status": "pending", "sources": ["L-QF-01", "L-QF-02"], "winnerSlot": null, "loserSlot": null }
+        ]
+      }
+    ],
+    "right": [
+      {
+        "id": "right_round_of_32",
+        "title": {
+          "zh": "32强",
+          "en": "Round of 32"
+        },
+        "matches": [
+          { "id": "R-R32-01", "status": "pending", "slots": [17, 18], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-02", "status": "pending", "slots": [19, 20], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-03", "status": "pending", "slots": [21, 22], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-04", "status": "pending", "slots": [23, 24], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-05", "status": "pending", "slots": [25, 26], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-06", "status": "pending", "slots": [27, 28], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-07", "status": "pending", "slots": [29, 30], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R32-08", "status": "pending", "slots": [31, 32], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "right_round_of_16",
+        "title": {
+          "zh": "16强",
+          "en": "Round of 16"
+        },
+        "matches": [
+          { "id": "R-R16-01", "status": "pending", "sources": ["R-R32-01", "R-R32-02"], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R16-02", "status": "pending", "sources": ["R-R32-03", "R-R32-04"], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R16-03", "status": "pending", "sources": ["R-R32-05", "R-R32-06"], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-R16-04", "status": "pending", "sources": ["R-R32-07", "R-R32-08"], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "right_quarterfinal",
+        "title": {
+          "zh": "8强",
+          "en": "Quarterfinals"
+        },
+        "matches": [
+          { "id": "R-QF-01", "status": "pending", "sources": ["R-R16-01", "R-R16-02"], "winnerSlot": null, "loserSlot": null },
+          { "id": "R-QF-02", "status": "pending", "sources": ["R-R16-03", "R-R16-04"], "winnerSlot": null, "loserSlot": null }
+        ]
+      },
+      {
+        "id": "right_semifinal",
+        "title": {
+          "zh": "4强",
+          "en": "Semifinals"
+        },
+        "matches": [
+          { "id": "R-SF-01", "status": "pending", "sources": ["R-QF-01", "R-QF-02"], "winnerSlot": null, "loserSlot": null }
+        ]
+      }
+    ],
+    "final": {
+      "id": "S1-FINAL",
+      "status": "pending",
+      "sources": ["L-SF-01", "R-SF-01"],
+      "winnerSlot": null,
+      "loserSlot": null
+    },
+    "thirdPlace": {
+      "id": "S1-THIRD",
+      "status": "pending",
+      "sources": ["L-SF-01:loser", "R-SF-01:loser"],
+      "winnerSlot": null,
+      "loserSlot": null
+    }
+  },
+  "placements": {
+    "championSlot": null,
+    "runnerUpSlot": null,
+    "thirdPlaceSlot": null,
+    "fourthPlaceSlot": null
+  }
+}

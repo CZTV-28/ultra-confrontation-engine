@@ -9,6 +9,7 @@ export interface S1RosterSlot {
   status: S1RosterStatus;
   characterId: string;
   characterName: string;
+  projectName: string;
   creator: string;
   sourcePath: string;
   reviewDecision: S1ReviewDecision;
@@ -22,6 +23,7 @@ export interface S1RosterEntryInput {
   slot: number;
   characterId: string;
   characterName: string;
+  projectName?: string;
   creator: string;
   sourcePath: string;
   reviewDecision: S1ReviewDecision;
@@ -59,6 +61,7 @@ function createEmptySlot(slot: number): S1RosterSlot {
     status: "empty",
     characterId: "",
     characterName: "",
+    projectName: "",
     creator: "",
     sourcePath: "",
     reviewDecision: "pending",
@@ -113,6 +116,7 @@ function normalizeSlot(value: unknown, fallbackSlot: number): S1RosterSlot {
     status,
     characterId,
     characterName: asString(value.characterName).trim(),
+    projectName: asString(value.projectName).trim(),
     creator: asString(value.creator).trim(),
     sourcePath: asString(value.sourcePath).trim(),
     reviewDecision: decision,
@@ -141,6 +145,48 @@ export function createEmptyS1Roster(): S1RosterSlot[] {
   return Array.from({ length: S1_ROSTER_SIZE }, (_, index) => createEmptySlot(index + 1));
 }
 
+export function normalizeS1Roster(value: unknown): S1RosterSlot[] {
+  const emptyRoster = createEmptyS1Roster();
+  if (!Array.isArray(value)) {
+    return emptyRoster;
+  }
+
+  const bySlot = new Map<number, S1RosterSlot>();
+  value.forEach((slotValue, index) => {
+    const normalized = normalizeSlot(slotValue, index + 1);
+    bySlot.set(normalized.slot, normalized);
+  });
+
+  return emptyRoster.map((slot) => bySlot.get(slot.slot) ?? slot);
+}
+
+export function sanitizeS1RosterForPublic(roster: S1RosterSlot[]): S1RosterSlot[] {
+  return normalizeS1Roster(roster).map((slot) => {
+    const publicStatus: S1RosterStatus =
+      slot.status === "approved" || slot.status === "imported" || slot.status === "trained"
+        ? slot.status
+        : slot.status === "pending_review"
+          ? "pending_review"
+          : "empty";
+    const canShowParticipant = publicStatus === "approved" || publicStatus === "imported" || publicStatus === "trained";
+
+    return {
+      ...slot,
+      status: publicStatus,
+      characterId: canShowParticipant ? slot.characterId : "",
+      characterName: canShowParticipant ? slot.characterName : "",
+      projectName: canShowParticipant ? slot.projectName : "",
+      creator: canShowParticipant ? slot.creator : "",
+      sourcePath: "",
+      reviewDecision: canShowParticipant ? "approved" : "pending",
+      officialNotes: "",
+      checksum: "",
+      reviewPackageStatus: "",
+      updatedAt: canShowParticipant ? slot.updatedAt : "",
+    };
+  });
+}
+
 export function readS1Roster(): S1RosterSlot[] {
   const emptyRoster = createEmptyS1Roster();
   const raw = getRawRoster();
@@ -151,30 +197,42 @@ export function readS1Roster(): S1RosterSlot[] {
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return emptyRoster;
-    }
-
-    const bySlot = new Map<number, S1RosterSlot>();
-    parsed.forEach((slotValue, index) => {
-      const normalized = normalizeSlot(slotValue, index + 1);
-      bySlot.set(normalized.slot, normalized);
-    });
-
-    return emptyRoster.map((slot) => bySlot.get(slot.slot) ?? slot);
+    return normalizeS1Roster(parsed);
   } catch (error) {
     console.error("Failed to read S1 roster", error);
     return emptyRoster;
   }
 }
 
-export function writeS1Roster(roster: S1RosterSlot[]) {
+export async function loadS1Roster(): Promise<S1RosterSlot[]> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const roster = normalizeS1Roster(await invoke<unknown>("list_s1_roster"));
+    writeS1Roster(roster, false);
+    return roster;
+  } catch {
+    return readS1Roster();
+  }
+}
+
+export async function loadS1PublicRoster(): Promise<S1RosterSlot[]> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return normalizeS1Roster(await invoke<unknown>("list_s1_public_roster"));
+  } catch {
+    return sanitizeS1RosterForPublic(readS1Roster());
+  }
+}
+
+export function writeS1Roster(roster: S1RosterSlot[], notify = true) {
   if (typeof window === "undefined") {
     return;
   }
 
   window.localStorage.setItem(S1_ROSTER_STORAGE_KEY, JSON.stringify(roster));
-  notifyRosterUpdated();
+  if (notify) {
+    notifyRosterUpdated();
+  }
 }
 
 export function findS1RosterSlot(roster: S1RosterSlot[], characterId: string) {
@@ -203,6 +261,7 @@ export function upsertS1RosterEntry(input: S1RosterEntryInput): S1RosterSlot[] {
     status,
     characterId: input.characterId.trim(),
     characterName: input.characterName.trim(),
+    projectName: input.projectName?.trim() ?? "",
     creator: input.creator.trim(),
     sourcePath: input.sourcePath.trim(),
     reviewDecision: input.reviewDecision,
@@ -255,8 +314,10 @@ export function getS1RosterStats(roster: S1RosterSlot[]): S1RosterStats {
         stats.rejected += 1;
       } else if (slot.status === "imported") {
         stats.imported += 1;
+        stats.approved += 1;
       } else if (slot.status === "trained") {
         stats.trained += 1;
+        stats.approved += 1;
       }
 
       return stats;

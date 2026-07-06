@@ -1,0 +1,22 @@
+{
+  "season": "S1",
+  "name": "S1: Origin",
+  "capacity": 32,
+  "updatedAt": "2026-07-06T00:00:00+00:00",
+  "slots": [
+    {
+      "slot": 1,
+      "status": "imported",
+      "characterId": "dcpe_sans",
+      "characterName": "DCPE!Sans",
+      "projectName": "尘埃传说：构想和平线",
+      "creator": "超酷超爱玩的百事通",
+      "sourcePath": "assets/characters/dcpe_sans.json",
+      "reviewDecision": "approved",
+      "officialNotes": "",
+      "checksum": "",
+      "reviewPackageStatus": "base_rules_passed",
+      "updatedAt": "2026-07-06T00:00:00+00:00"
+    }
+  ]
+}

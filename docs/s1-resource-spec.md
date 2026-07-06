@@ -10,6 +10,10 @@ This document defines the v0.1.0 resource format used by Ultra Confrontation Eng
 assets/
   characters/
     character_id.json
+  rosters/
+    S1.json
+  tournaments/
+    S1.json
   skills/
     skill_id.json
   arenas/
@@ -42,6 +46,48 @@ UCE v0.1.2 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件
 UCE v0.1.2 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
 
 After receiving a `.ucechar` file, officials should review rule compliance, custom passive effects, debuffs, and counter designs before importing the character into the official tournament resource library.
+
+## S1 Roster Resource / S1 名单资源
+
+`assets/rosters/S1.json` records the official S1 participant slots.
+
+`assets/rosters/S1.json` 用于记录 S1 官方参赛席位。
+
+- S1 has 32 roster slots.
+- Official import writes approved characters into the roster.
+- Events reads this roster to display registration and review progress.
+- Battle Simulation sorts official roster characters first.
+- Internal review uses the full roster data, including notes, source paths, checksums, and import status.
+- Public event views must use the sanitized roster feed, which removes notes, local paths, checksums, and rejected participant details.
+
+- S1 固定 32 个名单席位。
+- 官方导入通过审核的角色时，会同步写入名单。
+- 赛事页面会读取该名单展示报名和审核进度。
+- 模拟对战会优先显示已进入官方名单的角色。
+- 内部审核使用完整名单数据，包含官方备注、本地来源路径、校验码和导入状态。
+- 对外赛事视图必须使用脱敏后的名单数据，不暴露备注、本地路径、校验码和被驳回的参赛者详情。
+
+## S1 Tournament Resource / S1 赛事资源
+
+`assets/tournaments/S1.json` stores the tournament bracket, match status, and final placements for S1.
+
+`assets/tournaments/S1.json` 用于记录 S1 赛事对阵、对局状态和最终名次。
+
+- The bracket is split into left and right halves.
+- The first round references roster slots directly.
+- Later rounds reference source match IDs.
+- `placements` stores champion, runner-up, third place, and fourth place slot IDs.
+- The current file starts in `preparing` state and can be updated later by official match results.
+- Official S1 battle results write `winnerSlot`, `loserSlot`, optional `replayId`, and `updatedAt` to the matched bracket entry.
+- Later rounds resolve entrants from their `sources`; `MATCH_ID` means the source winner, and `MATCH_ID:loser` means the source loser.
+
+- 晋级表分为左半区和右半区。
+- 第一轮直接引用 S1 名单席位。
+- 后续轮次引用上一轮对局 ID。
+- `placements` 记录冠军、亚军、季军和第四名对应的席位 ID。
+- 当前文件处于 `preparing` 筹备状态，后续可由官方比赛结果更新。
+- 官方 S1 模拟对局结果会向对应对局写入 `winnerSlot`、`loserSlot`、可选的 `replayId` 和 `updatedAt`。
+- 后续轮次会从 `sources` 自动解析晋级者；`MATCH_ID` 表示来源对局胜者，`MATCH_ID:loser` 表示来源对局败者。
 
 ## 中文规则
 

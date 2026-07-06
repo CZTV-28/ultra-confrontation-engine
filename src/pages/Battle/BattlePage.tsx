@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import { useSettingsStore } from "../../store/settingsStore";
 import { decodeImageDataUrl } from "../../utils/portraitImage";
+import { loadS1PublicRoster, type S1RosterSlot } from "../../services/s1Roster";
 import "./BattlePage.css";
 
 interface BattlePageProps {
@@ -30,6 +31,7 @@ interface TurnRecord {
 
 interface BattleResult {
   winner: string;
+  winner_character_id: string;
   rounds_played: number;
   turns_played: number;
   final_hp_a: number;
@@ -37,6 +39,13 @@ interface BattleResult {
   loss_reason: string;
   replay_id: string;
   turns: TurnRecord[];
+}
+
+interface S1MatchRecordResult {
+  matchId: string;
+  winnerSlot: number;
+  loserSlot: number;
+  updatedAt: string;
 }
 
 interface CharacterSkills {
@@ -129,6 +138,7 @@ const MAX_HP = 500;
 const MAX_MP = 250;
 const CHARACTER_LIBRARY_SLOTS = 12;
 const ARENA_LIBRARY_SLOTS = 8;
+const OFFICIAL_ROSTER_STATUSES = new Set(["approved", "imported", "trained"]);
 
 const actionMap: Record<Language, Record<string, string>> = {
   zh: {
@@ -207,6 +217,8 @@ const battleCopy = {
     finishWriteError: "模拟已结束，但结果写入失败。",
     waitingEngine: "等待战斗引擎返回下一回合...",
     replaySaved: "模拟结束，回放已写入本地记录。",
+    s1ResultRecorded: (matchId: string) => `S1 对局 ${matchId} 结果已写入赛事表。`,
+    s1ResultWriteError: "S1 对局结果未能写入赛事表。",
     logTitle: "战斗日志",
     waitingStart: "等待模拟开始。",
     roundTurn: (round: number, turn: number) => `第 ${round} 轮 / 第 ${turn} 回合`,
@@ -271,6 +283,8 @@ const battleCopy = {
     finishWriteError: "Simulation ended, but the result could not be written.",
     waitingEngine: "Waiting for the battle engine to return the next turn...",
     replaySaved: "Simulation ended. Replay saved to local records.",
+    s1ResultRecorded: (matchId: string) => `S1 match ${matchId} result saved to bracket.`,
+    s1ResultWriteError: "Could not save the S1 match result to bracket.",
     logTitle: "Battle Log",
     waitingStart: "Waiting for simulation to start.",
     roundTurn: (round: number, turn: number) => `Round ${round} / Turn ${turn}`,
@@ -433,6 +447,33 @@ function ArenaPreview({ arena, compact = false }: { arena?: ArenaResource; compa
   );
 }
 
+function sortCharactersByS1Roster(characters: CharacterResource[], roster: S1RosterSlot[]) {
+  const rosterOrder = new Map(
+    roster
+      .filter((slot) => OFFICIAL_ROSTER_STATUSES.has(slot.status) && slot.characterId)
+      .map((slot) => [slot.characterId, slot.slot]),
+  );
+
+  if (rosterOrder.size === 0) {
+    return characters;
+  }
+
+  return [...characters].sort((left, right) => {
+    const leftSlot = rosterOrder.get(left.id);
+    const rightSlot = rosterOrder.get(right.id);
+    if (leftSlot && rightSlot) {
+      return leftSlot - rightSlot;
+    }
+    if (leftSlot) {
+      return -1;
+    }
+    if (rightSlot) {
+      return 1;
+    }
+    return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
+  });
+}
+
 export default function BattlePage({ goBack }: BattlePageProps) {
   const { i18n } = useTranslation();
   const { battleSpeed } = useSettingsStore();
@@ -445,11 +486,13 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [tournamentMessage, setTournamentMessage] = useState("");
   const [characters, setCharacters] = useState<CharacterResource[]>([]);
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, CharacterPortrait | null>>({});
   const [arenas, setArenas] = useState<ArenaResource[]>([]);
   const [rulesets, setRulesets] = useState<RulesetResource[]>([]);
   const [skills, setSkills] = useState<SkillResource[]>([]);
+  const [s1Roster, setS1Roster] = useState<S1RosterSlot[]>([]);
   const [selectedLeftId, setSelectedLeftId] = useState("");
   const [selectedRightId, setSelectedRightId] = useState("");
   const [selectedArenaId, setSelectedArenaId] = useState("");
@@ -464,6 +507,15 @@ export default function BattlePage({ goBack }: BattlePageProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   const skillById = useMemo(() => new Map(skills.map((skill) => [skill.id, skill])), [skills]);
+  const s1RosterSlotByCharacterId = useMemo(
+    () =>
+      new Map(
+        s1Roster
+          .filter((slot) => OFFICIAL_ROSTER_STATUSES.has(slot.status) && slot.characterId)
+          .map((slot) => [slot.characterId, slot.slot]),
+      ),
+    [s1Roster],
+  );
   const charactersWithPortraits = useMemo(
     () =>
       characters.map((character) => ({
@@ -546,6 +598,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     setTurns([]);
     setResult(null);
     setErrorMessage("");
+    setTournamentMessage("");
     setPhase("select");
   };
 
@@ -608,28 +661,35 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
       try {
         setCharacterPortraits({});
-        const [loadedCharacters, loadedArenas, loadedRulesets, loadedSkills] = await Promise.all([
+        const [loadedCharacters, loadedArenas, loadedRulesets, loadedSkills, loadedRoster] = await Promise.all([
           invoke<CharacterResource[]>("list_characters"),
           invoke<ArenaResource[]>("list_arenas"),
           invoke<RulesetResource[]>("list_rulesets"),
           invoke<SkillResource[]>("list_skills"),
+          loadS1PublicRoster(),
         ]);
 
         if (cancelled) {
           return;
         }
 
-        setCharacters(loadedCharacters);
+        const rosterSortedCharacters = sortCharactersByS1Roster(
+          loadedCharacters,
+          loadedRoster,
+        );
+
+        setS1Roster(loadedRoster);
+        setCharacters(rosterSortedCharacters);
         setArenas(loadedArenas);
         setRulesets(loadedRulesets);
         setSkills(loadedSkills);
         setSelectedLeftId((current) =>
-          loadedCharacters.some((character) => character.id === current) ? current : loadedCharacters[0]?.id ?? "",
+          rosterSortedCharacters.some((character) => character.id === current) ? current : rosterSortedCharacters[0]?.id ?? "",
         );
         setSelectedRightId((current) =>
-          loadedCharacters.some((character) => character.id === current)
+          rosterSortedCharacters.some((character) => character.id === current)
             ? current
-            : loadedCharacters[1]?.id ?? loadedCharacters[0]?.id ?? "",
+            : rosterSortedCharacters[1]?.id ?? rosterSortedCharacters[0]?.id ?? "",
         );
         setSelectedArenaId((current) =>
           loadedArenas.some((arena) => arena.id === current) ? current : loadedArenas[0]?.id ?? "",
@@ -703,6 +763,40 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     };
   }, [characters]);
 
+  const recordS1MatchResult = async (finalResult: BattleResult) => {
+    if (selectedRulesetId !== "S1" || !finalResult.winner_character_id) {
+      return;
+    }
+
+    const leftSlot = s1RosterSlotByCharacterId.get(selectedLeftId);
+    const rightSlot = s1RosterSlotByCharacterId.get(selectedRightId);
+    if (!leftSlot || !rightSlot) {
+      return;
+    }
+
+    try {
+      const record = await invoke<S1MatchRecordResult>("record_s1_match_result", {
+        input: {
+          leftCharacterId: selectedLeftId,
+          rightCharacterId: selectedRightId,
+          winnerCharacterId: finalResult.winner_character_id,
+          replayId: finalResult.replay_id,
+        },
+      });
+      setTournamentMessage(copy.s1ResultRecorded(record.matchId));
+      window.dispatchEvent(new CustomEvent("uce:s1-tournament-updated"));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setTournamentMessage(`${copy.s1ResultWriteError} ${detail}`);
+    }
+  };
+
+  const finishBattleResult = async (finalResult: BattleResult, fallbackTurns?: TurnRecord[]) => {
+    setTurns(finalResult.turns.length > 0 ? finalResult.turns : fallbackTurns ?? []);
+    setResult(finalResult);
+    await recordS1MatchResult(finalResult);
+  };
+
   const startBattle = async () => {
     if (!canConfirmSelection) {
       setErrorMessage(copy.assetLoadError);
@@ -713,6 +807,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
     setTurns([]);
     setResult(null);
     setErrorMessage("");
+    setTournamentMessage("");
     setPhase("battle");
     setRunning(true);
 
@@ -736,8 +831,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
           } catch {
             try {
               const finalResult = await invoke<BattleResult>("finish_battle", { sessionId: id });
-              setTurns(finalResult.turns.length > 0 ? finalResult.turns : completedTurns);
-              setResult(finalResult);
+              await finishBattleResult(finalResult, completedTurns);
             } catch {
               setTurns(completedTurns);
               setErrorMessage(copy.finishWriteError);
@@ -760,8 +854,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
         } catch {
           try {
             const finalResult = await invoke<BattleResult>("finish_battle", { sessionId: id });
-            setTurns(finalResult.turns);
-            setResult(finalResult);
+            await finishBattleResult(finalResult);
           } catch {
             setErrorMessage(copy.finishWriteError);
           }
@@ -1285,7 +1378,7 @@ export default function BattlePage({ goBack }: BattlePageProps) {
 
                 <div className="battle-command-line">
                   {running && copy.waitingEngine}
-                  {!running && result && copy.replaySaved}
+                  {!running && result && (tournamentMessage || copy.replaySaved)}
                   {!running && !result && errorMessage}
                 </div>
               </section>

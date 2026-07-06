@@ -1,12 +1,20 @@
 .rules-shell {
-  width: min(1380px, calc(100vw - 56px));
-  height: min(830px, calc(100vh - 48px));
+  width: var(--rules-width, 1380px);
+  height: var(--rules-height, 830px);
   position: relative;
   z-index: 1;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 30px;
   gap: 14px;
   color: #f7fbff;
+  font-family:
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    Inter,
+    Arial,
+    sans-serif;
+  font-kerning: normal;
 }
 
 .rules-header {
@@ -50,7 +58,7 @@
   margin-top: 12px;
   color: rgba(226, 243, 255, 0.76);
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .rules-back-button {
@@ -169,6 +177,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.35;
 }
 
 .rules-season-card strong {
@@ -189,10 +198,11 @@
 .rules-detail-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1.15fr) minmax(0, 0.85fr);
   gap: 14px;
   padding: 16px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .rules-season-hero {
@@ -226,6 +236,7 @@
   margin-top: 10px;
   color: rgba(255, 255, 255, 0.68);
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .rules-season-badge {
@@ -251,9 +262,11 @@
 }
 
 .rules-event-content {
-  min-height: 248px;
+  min-height: 0;
   padding: 16px;
   box-sizing: border-box;
+  overflow: auto;
+  scrollbar-color: rgba(255, 200, 87, 0.48) rgba(255, 255, 255, 0.08);
 }
 
 .rules-empty-event,
@@ -304,8 +317,8 @@
 
 .rules-roster-summary span {
   color: rgba(226, 243, 255, 0.72);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 .rules-roster-summary dl {
@@ -330,7 +343,8 @@
 .rules-roster-summary dt {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.54);
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 1.3;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -345,24 +359,26 @@
 }
 
 .rules-roster-grid {
-  max-height: 210px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  overflow: auto;
-  padding-right: 4px;
-  scrollbar-color: rgba(255, 200, 87, 0.48) rgba(255, 255, 255, 0.08);
+  overflow: visible;
 }
 
 .rules-roster-slot {
   min-width: 0;
-  min-height: 92px;
-  padding: 10px;
+  min-height: 124px;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  row-gap: 2px;
+  align-content: start;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent),
     rgba(0, 0, 0, 0.42);
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .rules-roster-slot-head {
@@ -370,7 +386,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 .rules-roster-slot-head strong {
@@ -385,13 +401,13 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rules-roster-slot h3,
-.rules-roster-slot p {
+.rules-roster-slot h3 {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -399,15 +415,22 @@
 }
 
 .rules-roster-slot h3 {
-  margin: 0 0 6px;
+  margin: 0 0 5px;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 15.5px;
+  line-height: 1.35;
 }
 
 .rules-roster-slot p {
-  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0 2px;
   color: rgba(226, 243, 255, 0.64);
   font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rules-roster-slot-empty {
@@ -428,6 +451,506 @@
 .rules-roster-slot-rejected {
   border-color: rgba(255, 90, 78, 0.46);
   box-shadow: inset 0 0 18px rgba(255, 90, 78, 0.04);
+}
+
+.rules-bracket-panel {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(91, 231, 255, 0.22);
+  background:
+    linear-gradient(90deg, rgba(91, 231, 255, 0.08), rgba(255, 200, 87, 0.04)),
+    rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rules-bracket-heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.rules-bracket-heading strong {
+  color: #ffffff;
+  font-size: 17px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.rules-bracket-heading span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(226, 243, 255, 0.68);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+  overflow: visible;
+}
+
+.rules-bracket-side {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rules-bracket-column {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.rules-bracket-round-title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(90deg, rgba(255, 200, 87, 0.08), transparent),
+    rgba(255, 255, 255, 0.045);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rules-bracket-round-title strong,
+.rules-bracket-round-title span,
+.rules-bracket-round-title em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-round-title strong {
+  color: #ffc857;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.rules-bracket-round-title span {
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.rules-bracket-round-title em {
+  color: rgba(142, 255, 122, 0.8);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.25;
+}
+
+.rules-bracket-matches {
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.rules-bracket-match {
+  position: relative;
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent),
+    rgba(0, 0, 0, 0.42);
+  box-sizing: border-box;
+}
+
+.rules-bracket-side-left .rules-bracket-column:not(:last-child) .rules-bracket-match::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -23px;
+  width: 22px;
+  height: 1px;
+  background: rgba(91, 231, 255, 0.42);
+  box-shadow: 0 0 10px rgba(91, 231, 255, 0.34);
+}
+
+.rules-bracket-side-right .rules-bracket-column:not(:first-child) .rules-bracket-match::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -23px;
+  width: 22px;
+  height: 1px;
+  background: rgba(91, 231, 255, 0.42);
+  box-shadow: 0 0 10px rgba(91, 231, 255, 0.34);
+}
+
+.rules-bracket-match-label {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  color: rgba(255, 200, 87, 0.9);
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-player {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  padding: 4px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  box-sizing: border-box;
+}
+
+.rules-bracket-player strong,
+.rules-bracket-player span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-player strong {
+  color: #ffffff;
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.rules-bracket-player span {
+  color: rgba(226, 243, 255, 0.62);
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.rules-bracket-player-ready {
+  border-color: rgba(142, 255, 122, 0.26);
+  background: rgba(142, 255, 122, 0.065);
+}
+
+.rules-bracket-player-empty {
+  opacity: 0.52;
+}
+
+.rules-bracket-player-pending {
+  border-style: dashed;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.rules-bracket-match-final {
+  border-color: rgba(255, 200, 87, 0.32);
+  box-shadow: inset 0 0 18px rgba(255, 200, 87, 0.06);
+}
+
+.rules-bracket-center {
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+}
+
+.rules-bracket-center > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rules-bracket-center .rules-bracket-match {
+  min-height: 92px;
+}
+
+.rules-bracket-center .rules-bracket-match-final::before,
+.rules-bracket-center .rules-bracket-match-final::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 1px;
+  background: rgba(255, 200, 87, 0.5);
+  box-shadow: 0 0 12px rgba(255, 200, 87, 0.34);
+}
+
+.rules-bracket-center .rules-bracket-match-final::before {
+  left: -25px;
+}
+
+.rules-bracket-center .rules-bracket-match-final::after {
+  right: -25px;
+}
+
+.rules-bracket-champion {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  place-items: center;
+  padding: 14px 10px;
+  border: 1px solid rgba(255, 200, 87, 0.42);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 224, 120, 0.34), transparent 54%),
+    radial-gradient(circle at 50% 100%, rgba(255, 188, 38, 0.16), transparent 62%),
+    rgba(0, 0, 0, 0.48);
+  box-shadow:
+    inset 0 0 24px rgba(255, 224, 120, 0.16),
+    0 0 22px rgba(255, 200, 87, 0.18),
+    0 0 44px rgba(255, 188, 38, 0.08);
+  animation: rules-champion-aura 2.35s ease-in-out infinite;
+  text-align: center;
+}
+
+.rules-bracket-champion::before,
+.rules-bracket-champion::after,
+.rules-bracket-medal-runner-up::before,
+.rules-bracket-medal-runner-up::after,
+.rules-bracket-medal-third::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(255, 224, 120, 0.72), rgba(91, 231, 255, 0.42));
+  box-shadow:
+    0 0 10px rgba(255, 224, 120, 0.22),
+    0 0 16px rgba(91, 231, 255, 0.12);
+  pointer-events: none;
+}
+
+.rules-bracket-champion::before {
+  top: 50%;
+  left: -25px;
+  width: 24px;
+  height: 1px;
+  transform: none;
+  background: rgba(255, 224, 120, 0.58);
+  box-shadow: 0 0 12px rgba(255, 224, 120, 0.28);
+}
+
+.rules-bracket-champion::after {
+  top: 50%;
+  right: -25px;
+  left: auto;
+  width: 24px;
+  height: 1px;
+  transform: none;
+  background: rgba(255, 224, 120, 0.58);
+  box-shadow: 0 0 12px rgba(255, 224, 120, 0.28);
+}
+
+.rules-bracket-champion i {
+  position: absolute;
+  left: 50%;
+  bottom: -15px;
+  width: 2px;
+  height: 15px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(255, 224, 120, 0.72), rgba(207, 232, 255, 0.48));
+  box-shadow:
+    0 0 10px rgba(255, 224, 120, 0.22),
+    0 0 16px rgba(91, 231, 255, 0.12);
+  pointer-events: none;
+}
+
+.rules-bracket-champion span {
+  color: rgba(255, 224, 120, 0.96);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.rules-bracket-champion strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: #ffffff;
+  text-shadow:
+    0 0 12px rgba(255, 224, 120, 0.34),
+    0 0 24px rgba(255, 188, 38, 0.18);
+  font-size: 18px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-champion em {
+  color: rgba(142, 255, 122, 0.82);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.rules-bracket-podium {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.rules-bracket-medal {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.045);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.rules-bracket-medal span,
+.rules-bracket-medal strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-bracket-medal span {
+  color: rgba(255, 200, 87, 0.86);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rules-bracket-medal strong {
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.rules-bracket-medal-runner-up {
+  border-color: rgba(180, 222, 255, 0.38);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(207, 232, 255, 0.22), transparent 58%),
+    linear-gradient(135deg, rgba(104, 178, 255, 0.12), rgba(235, 245, 255, 0.055)),
+    rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 0 18px rgba(210, 236, 255, 0.1),
+    0 0 18px rgba(104, 178, 255, 0.14);
+  animation: rules-runner-up-aura 2.9s ease-in-out infinite;
+}
+
+.rules-bracket-medal-runner-up::before {
+  top: -9px;
+  height: 9px;
+  background: linear-gradient(180deg, rgba(207, 232, 255, 0.72), rgba(104, 178, 255, 0.5));
+}
+
+.rules-bracket-medal-runner-up::after {
+  bottom: -9px;
+  height: 9px;
+  background: linear-gradient(180deg, rgba(104, 178, 255, 0.5), rgba(211, 134, 62, 0.5));
+}
+
+.rules-bracket-medal-third {
+  border-color: rgba(211, 134, 62, 0.42);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(214, 127, 50, 0.2), transparent 58%),
+    linear-gradient(135deg, rgba(177, 93, 40, 0.12), rgba(255, 198, 130, 0.05)),
+    rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 0 18px rgba(214, 127, 50, 0.1),
+    0 0 18px rgba(205, 116, 46, 0.14);
+  animation: rules-third-place-aura 3.15s ease-in-out infinite;
+}
+
+.rules-bracket-medal-third::before {
+  top: -9px;
+  height: 9px;
+  background: linear-gradient(180deg, rgba(211, 134, 62, 0.62), rgba(205, 116, 46, 0.46));
+}
+
+.rules-bracket-medal-wing {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 1px;
+  background: rgba(211, 134, 62, 0.56);
+  box-shadow: 0 0 12px rgba(211, 134, 62, 0.24);
+  pointer-events: none;
+}
+
+.rules-bracket-medal-wing-left {
+  left: -45px;
+}
+
+.rules-bracket-medal-wing-right {
+  right: -45px;
+}
+
+@keyframes rules-champion-aura {
+  0%,
+  100% {
+    border-color: rgba(255, 200, 87, 0.44);
+    box-shadow:
+      inset 0 0 24px rgba(255, 224, 120, 0.14),
+      0 0 20px rgba(255, 200, 87, 0.18),
+      0 0 44px rgba(255, 188, 38, 0.08);
+    filter: brightness(1);
+  }
+
+  50% {
+    border-color: rgba(255, 235, 150, 0.9);
+    box-shadow:
+      inset 0 0 34px rgba(255, 235, 150, 0.28),
+      0 0 30px rgba(255, 224, 120, 0.42),
+      0 0 72px rgba(255, 188, 38, 0.24);
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes rules-runner-up-aura {
+  0%,
+  100% {
+    border-color: rgba(180, 222, 255, 0.38);
+    box-shadow:
+      inset 0 0 18px rgba(210, 236, 255, 0.1),
+      0 0 18px rgba(104, 178, 255, 0.14);
+    filter: brightness(1);
+  }
+
+  50% {
+    border-color: rgba(225, 244, 255, 0.82);
+    box-shadow:
+      inset 0 0 28px rgba(225, 244, 255, 0.22),
+      0 0 26px rgba(116, 190, 255, 0.34),
+      0 0 54px rgba(226, 243, 255, 0.16);
+    filter: brightness(1.14);
+  }
+}
+
+@keyframes rules-third-place-aura {
+  0%,
+  100% {
+    border-color: rgba(211, 134, 62, 0.42);
+    box-shadow:
+      inset 0 0 18px rgba(214, 127, 50, 0.1),
+      0 0 18px rgba(205, 116, 46, 0.14);
+    filter: brightness(1);
+  }
+
+  50% {
+    border-color: rgba(255, 178, 95, 0.78);
+    box-shadow:
+      inset 0 0 26px rgba(255, 150, 70, 0.2),
+      0 0 24px rgba(224, 123, 50, 0.3),
+      0 0 48px rgba(178, 83, 35, 0.18);
+    filter: brightness(1.12);
+  }
 }
 
 .rules-rulebook {
@@ -490,7 +1013,7 @@
   margin: 0 0 10px;
   color: rgba(226, 243, 255, 0.82);
   font-size: 14px;
-  line-height: 1.52;
+  line-height: 1.65;
 }
 
 .rules-card li::before {
@@ -516,8 +1039,8 @@
 
 @media (max-width: 980px) {
   .rules-shell {
-    width: calc(100vw - 28px);
-    height: calc(100vh - 30px);
+    width: var(--rules-width, 1380px);
+    height: var(--rules-height, 830px);
   }
 
   .rules-header,
@@ -544,5 +1067,24 @@
 
   .rules-roster-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rules-bracket-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .rules-bracket-heading span {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .rules-bracket-stage {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.34fr) minmax(0, 1fr);
+  }
+
+  .rules-bracket-side {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

@@ -6,9 +6,12 @@ import {
   S1_ROSTER_SIZE,
   findS1RosterSlot,
   getFirstEmptyS1RosterSlot,
+  getS1RosterStats,
+  loadS1Roster,
+  normalizeS1Roster,
   readS1Roster,
-  updateS1RosterEntryStatus,
   upsertS1RosterEntry,
+  writeS1Roster,
   type S1ReviewDecision,
   type S1RosterSlot,
 } from "../../services/s1Roster";
@@ -114,6 +117,7 @@ interface OfficialImportResult {
   skill_ids: string[];
   passive_id: string | null;
   written_files: string[];
+  roster: S1RosterSlot[];
   validation: {
     valid: boolean;
     errors: string[];
@@ -160,6 +164,13 @@ const copy = {
     officialNotes: "官方备注",
     notesPlaceholder: "填写审核意见、需要返工的原因，或进入官方资源库前的处理说明。",
     rosterSlot: "S1 名单席位",
+    rosterOverview: "S1 名单概览",
+    rosterOccupied: "已登记",
+    rosterApproved: "已通过",
+    rosterPending: "待复核",
+    selectedSlot: "当前席位",
+    slotEmpty: "当前席位为空。",
+    slotOccupied: "当前席位已存在角色。",
     registerRoster: "R 登记到 S1 名单",
     registered: "已登记到 S1 名单。",
     rosterFull: "S1 名单已满，请手动选择要覆盖的席位。",
@@ -217,6 +228,13 @@ const copy = {
     officialNotes: "Official Notes",
     notesPlaceholder: "Write review notes, required fixes, or handling notes before official import.",
     rosterSlot: "S1 Roster Slot",
+    rosterOverview: "S1 Roster Overview",
+    rosterOccupied: "Registered",
+    rosterApproved: "Approved",
+    rosterPending: "Pending",
+    selectedSlot: "Selected Slot",
+    slotEmpty: "The selected slot is empty.",
+    slotOccupied: "The selected slot already contains a character.",
     registerRoster: "R Register to S1 Roster",
     registered: "Registered to the S1 roster.",
     rosterFull: "The S1 roster is full. Select a slot to overwrite manually.",
@@ -768,6 +786,8 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
     [characterId, roster],
   );
   const selectedRosterSlot = roster.find((slot) => slot.slot === selectedSlot) ?? null;
+  const rosterStats = useMemo(() => getS1RosterStats(roster), [roster]);
+  const selectedSlotOccupied = Boolean(selectedRosterSlot?.characterId.trim());
   const canApproveOfficial = errors === 0;
 
   const officialBundle = useMemo(
@@ -788,10 +808,21 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   const canExportOfficialPackage = Boolean(officialDecision === "approved" && canApproveOfficial && officialBundle);
 
   useEffect(() => {
-    const handleRosterUpdated = () => setRoster(readS1Roster());
+    let cancelled = false;
+    const refreshRoster = () => {
+      void loadS1Roster().then((nextRoster) => {
+        if (!cancelled) {
+          setRoster(nextRoster);
+        }
+      });
+    };
 
-    window.addEventListener("uce:s1-roster-updated", handleRosterUpdated);
-    return () => window.removeEventListener("uce:s1-roster-updated", handleRosterUpdated);
+    refreshRoster();
+    window.addEventListener("uce:s1-roster-updated", refreshRoster);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("uce:s1-roster-updated", refreshRoster);
+    };
   }, []);
 
   useEffect(() => {
@@ -887,6 +918,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       slot: selectedSlot,
       characterId: asString(character?.id, "unknown_character"),
       characterName: asString(character?.name, "Unnamed Character"),
+      projectName: asString(character?.project_name),
       creator: asString(character?.creator, "Unknown Creator"),
       sourcePath,
       reviewDecision: officialDecision,
@@ -948,7 +980,9 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
 
       setOfficialImportResult(result);
       setOfficialImportError("");
-      setRoster(updateS1RosterEntryStatus(result.character_id, "imported"));
+      const importedRoster = normalizeS1Roster(result.roster);
+      writeS1Roster(importedRoster);
+      setRoster(importedRoster);
       setStatus(`${t.assetsImported} ${result.character_id}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -984,6 +1018,33 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       setStatus(t.exportFailed);
     }
   };
+
+  const renderRosterOverview = () => (
+    <div className="review-roster-overview">
+      <div>
+        <span>{t.rosterOverview}</span>
+        <strong>{rosterStats.occupied} / {rosterStats.total}</strong>
+      </div>
+      <dl>
+        <div><dt>{t.rosterApproved}</dt><dd>{rosterStats.approved}</dd></div>
+        <div><dt>{t.rosterPending}</dt><dd>{rosterStats.pending}</dd></div>
+        <div><dt>{t.rosterOccupied}</dt><dd>{rosterStats.occupied}</dd></div>
+      </dl>
+      <article className={`review-selected-slot ${selectedSlotOccupied ? "review-selected-slot-occupied" : ""}`}>
+        <span>{t.selectedSlot} #{String(selectedSlot).padStart(2, "0")}</span>
+        <strong>
+          {selectedSlotOccupied
+            ? selectedRosterSlot?.characterName || selectedRosterSlot?.characterId
+            : t.slotEmpty}
+        </strong>
+        {selectedSlotOccupied && (
+          <em>
+            {selectedRosterSlot?.projectName || selectedRosterSlot?.creator || t.slotOccupied}
+          </em>
+        )}
+      </article>
+    </div>
+  );
 
   const renderOfficialImportPanel = () => (
     <section className="review-panel review-official-import-panel">
@@ -1092,7 +1153,10 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
             <h2>{t.noFile}</h2>
             <p>{t.noFileHint}</p>
             <button type="button" onClick={importSubmission}>{t.import}</button>
-            {renderOfficialImportPanel()}
+            <div className="review-empty-panels">
+              {renderRosterOverview()}
+              {renderOfficialImportPanel()}
+            </div>
           </section>
         ) : (
           <section className="review-workspace">
@@ -1139,6 +1203,8 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
                     })}
                   </select>
                 </label>
+
+                {renderRosterOverview()}
 
                 <label className="review-field">
                   <span>{t.officialNotes}</span>

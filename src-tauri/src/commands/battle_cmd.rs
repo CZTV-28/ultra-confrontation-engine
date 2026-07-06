@@ -8,6 +8,7 @@ use crate::rules::RuleEngine;
 use crate::validator::{
     format_validation_errors, validate_assets as validate_asset_library, AssetValidationReport,
 };
+use chrono::Utc;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const MAX_REPLAYS: usize = 20;
 const UCR_MAGIC: &[u8; 3] = b"UCR";
 const UCR_VERSION: u8 = 1;
+const S1_ROSTER_SIZE: usize = 32;
+const S1_ROSTER_SEASON: &str = "S1";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TurnRecord {
@@ -61,6 +64,7 @@ pub struct ReplayData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BattleCommandResult {
     pub winner: String,
+    pub winner_character_id: String,
     pub rounds_played: i32,
     pub turns_played: i32,
     pub final_hp_a: i32,
@@ -74,14 +78,30 @@ pub struct BattleCommandResult {
 struct OfficialImportPackage {
     package_type: String,
     review: OfficialImportReview,
+    #[serde(default)]
+    source: Option<Value>,
+    #[serde(default)]
+    roster: Option<OfficialImportRoster>,
     official_assets: OfficialImportAssets,
 }
 
 #[derive(Debug, Deserialize)]
 struct OfficialImportReview {
+    #[serde(default)]
+    base_status: String,
     official_decision: String,
     #[serde(default)]
+    official_notes: String,
+    #[serde(default)]
     errors: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct OfficialImportRoster {
+    #[serde(default)]
+    season: String,
+    #[serde(default)]
+    slot: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,6 +119,110 @@ pub struct OfficialImportResult {
     pub passive_id: Option<String>,
     pub written_files: Vec<String>,
     pub validation: AssetValidationReport,
+    pub roster: Vec<S1RosterSlot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S1RosterSlot {
+    pub slot: usize,
+    pub status: String,
+    pub character_id: String,
+    pub character_name: String,
+    pub project_name: String,
+    pub creator: String,
+    pub source_path: String,
+    pub review_decision: String,
+    pub official_notes: String,
+    pub checksum: String,
+    pub review_package_status: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1RosterFile {
+    season: String,
+    name: String,
+    capacity: usize,
+    updated_at: String,
+    slots: Vec<S1RosterSlot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1TournamentFile {
+    season: String,
+    name: String,
+    format: String,
+    status: String,
+    capacity: usize,
+    updated_at: String,
+    bracket: S1TournamentBracket,
+    placements: S1TournamentPlacements,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1TournamentBracket {
+    left: Vec<S1TournamentRound>,
+    right: Vec<S1TournamentRound>,
+    #[serde(rename = "final")]
+    final_match: S1TournamentMatch,
+    third_place: S1TournamentMatch,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1TournamentRound {
+    id: String,
+    title: Value,
+    matches: Vec<S1TournamentMatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1TournamentMatch {
+    id: String,
+    status: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    slots: Vec<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sources: Vec<String>,
+    winner_slot: Option<usize>,
+    loser_slot: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    replay_id: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S1TournamentPlacements {
+    champion_slot: Option<usize>,
+    runner_up_slot: Option<usize>,
+    third_place_slot: Option<usize>,
+    fourth_place_slot: Option<usize>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S1MatchResultInput {
+    pub left_character_id: String,
+    pub right_character_id: String,
+    pub winner_character_id: String,
+    #[serde(default)]
+    pub replay_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S1MatchRecordResult {
+    pub match_id: String,
+    pub winner_slot: usize,
+    pub loser_slot: usize,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +237,8 @@ pub struct BattleConfig {
 pub struct BattleSession {
     pub engine: BattleEngine,
     pub rng: StdRng,
+    pub char_a_id: String,
+    pub char_b_id: String,
     pub char_a_name: String,
     pub char_b_name: String,
     pub turns: Vec<TurnRecord>,
@@ -167,6 +293,466 @@ fn official_asset_dirs() -> Vec<PathBuf> {
         }
     }
     dirs
+}
+
+fn now_iso() -> String {
+    Utc::now().to_rfc3339()
+}
+
+fn empty_s1_roster_slot(slot: usize) -> S1RosterSlot {
+    S1RosterSlot {
+        slot,
+        status: "empty".to_string(),
+        character_id: String::new(),
+        character_name: String::new(),
+        project_name: String::new(),
+        creator: String::new(),
+        source_path: String::new(),
+        review_decision: "pending".to_string(),
+        official_notes: String::new(),
+        checksum: String::new(),
+        review_package_status: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn empty_s1_roster_file() -> S1RosterFile {
+    S1RosterFile {
+        season: S1_ROSTER_SEASON.to_string(),
+        name: "S1: Origin".to_string(),
+        capacity: S1_ROSTER_SIZE,
+        updated_at: String::new(),
+        slots: (1..=S1_ROSTER_SIZE).map(empty_s1_roster_slot).collect(),
+    }
+}
+
+fn s1_roster_path(base_dir: &Path) -> PathBuf {
+    base_dir.join("rosters").join("S1.json")
+}
+
+fn s1_tournament_path(base_dir: &Path) -> PathBuf {
+    base_dir.join("tournaments").join("S1.json")
+}
+
+fn normalize_s1_roster_file(mut roster: S1RosterFile) -> S1RosterFile {
+    roster.season = S1_ROSTER_SEASON.to_string();
+    roster.name = if roster.name.trim().is_empty() {
+        "S1: Origin".to_string()
+    } else {
+        roster.name
+    };
+    roster.capacity = S1_ROSTER_SIZE;
+
+    let mut normalized_slots: Vec<S1RosterSlot> =
+        (1..=S1_ROSTER_SIZE).map(empty_s1_roster_slot).collect();
+    for mut slot in roster.slots {
+        if !(1..=S1_ROSTER_SIZE).contains(&slot.slot) {
+            continue;
+        }
+
+        let slot_number = slot.slot;
+        if slot.character_id.trim().is_empty() {
+            slot = empty_s1_roster_slot(slot_number);
+        } else if slot.status.trim().is_empty() {
+            slot.status = "pending_review".to_string();
+        }
+
+        normalized_slots[slot_number - 1] = slot;
+    }
+    roster.slots = normalized_slots;
+    roster
+}
+
+fn read_s1_roster_file(base_dir: &Path) -> Result<S1RosterFile, String> {
+    let path = s1_roster_path(base_dir);
+    if !path.exists() {
+        return Ok(empty_s1_roster_file());
+    }
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("读取 S1 名单失败 {}: {}", path.display(), e))?;
+    let roster: S1RosterFile = serde_json::from_str(&content)
+        .map_err(|e| format!("解析 S1 名单失败 {}: {}", path.display(), e))?;
+    Ok(normalize_s1_roster_file(roster))
+}
+
+fn read_s1_tournament_file(base_dir: &Path) -> Result<Value, String> {
+    let path = s1_tournament_path(base_dir);
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("读取 S1 赛事数据失败 {}: {}", path.display(), e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("解析 S1 赛事数据失败 {}: {}", path.display(), e))
+}
+
+fn read_s1_tournament_struct(base_dir: &Path) -> Result<S1TournamentFile, String> {
+    let path = s1_tournament_path(base_dir);
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("读取 S1 赛事数据失败 {}: {}", path.display(), e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("解析 S1 赛事数据失败 {}: {}", path.display(), e))
+}
+
+fn write_s1_roster_file(base_dir: &Path, roster: &S1RosterFile) -> Result<PathBuf, String> {
+    let path = s1_roster_path(base_dir);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建 S1 名单目录失败 {}: {}", parent.display(), e))?;
+    }
+
+    let content =
+        serde_json::to_string_pretty(roster).map_err(|e| format!("序列化 S1 名单失败: {}", e))?;
+    fs::write(&path, format!("{}\n", content))
+        .map_err(|e| format!("写入 S1 名单失败 {}: {}", path.display(), e))?;
+    Ok(path)
+}
+
+fn write_s1_tournament_file(
+    base_dir: &Path,
+    tournament: &S1TournamentFile,
+) -> Result<PathBuf, String> {
+    let path = s1_tournament_path(base_dir);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建 S1 赛事目录失败 {}: {}", parent.display(), e))?;
+    }
+
+    let content = serde_json::to_string_pretty(tournament)
+        .map_err(|e| format!("序列化 S1 赛事数据失败: {}", e))?;
+    fs::write(&path, format!("{}\n", content))
+        .map_err(|e| format!("写入 S1 赛事数据失败 {}: {}", path.display(), e))?;
+    Ok(path)
+}
+
+fn s1_roster_slot_for_character(
+    roster: &S1RosterFile,
+    character_id: &str,
+) -> Result<usize, String> {
+    roster
+        .slots
+        .iter()
+        .find(|slot| slot.character_id == character_id)
+        .map(|slot| slot.slot)
+        .ok_or_else(|| format!("角色不在 S1 官方名单中: {}", character_id))
+}
+
+fn split_tournament_source(source: &str) -> (&str, bool) {
+    source
+        .strip_suffix(":loser")
+        .map(|match_id| (match_id, true))
+        .unwrap_or((source, false))
+}
+
+fn find_s1_match<'a>(
+    tournament: &'a S1TournamentFile,
+    match_id: &str,
+) -> Option<&'a S1TournamentMatch> {
+    tournament
+        .bracket
+        .left
+        .iter()
+        .chain(tournament.bracket.right.iter())
+        .flat_map(|round| round.matches.iter())
+        .chain(std::iter::once(&tournament.bracket.final_match))
+        .chain(std::iter::once(&tournament.bracket.third_place))
+        .find(|match_data| match_data.id == match_id)
+}
+
+fn find_s1_match_mut<'a>(
+    tournament: &'a mut S1TournamentFile,
+    match_id: &str,
+) -> Option<&'a mut S1TournamentMatch> {
+    for round in tournament
+        .bracket
+        .left
+        .iter_mut()
+        .chain(tournament.bracket.right.iter_mut())
+    {
+        if let Some(match_data) = round
+            .matches
+            .iter_mut()
+            .find(|match_data| match_data.id == match_id)
+        {
+            return Some(match_data);
+        }
+    }
+
+    if tournament.bracket.final_match.id == match_id {
+        return Some(&mut tournament.bracket.final_match);
+    }
+
+    if tournament.bracket.third_place.id == match_id {
+        return Some(&mut tournament.bracket.third_place);
+    }
+
+    None
+}
+
+fn s1_match_participant_slots(
+    tournament: &S1TournamentFile,
+    match_data: &S1TournamentMatch,
+) -> Vec<usize> {
+    if !match_data.slots.is_empty() {
+        return match_data.slots.clone();
+    }
+
+    match_data
+        .sources
+        .iter()
+        .filter_map(|source| {
+            let (match_id, use_loser) = split_tournament_source(source);
+            let source_match = find_s1_match(tournament, match_id)?;
+            if use_loser {
+                source_match.loser_slot
+            } else {
+                source_match.winner_slot
+            }
+        })
+        .collect()
+}
+
+fn find_s1_match_for_slots(
+    tournament: &S1TournamentFile,
+    left_slot: usize,
+    right_slot: usize,
+) -> Option<String> {
+    tournament
+        .bracket
+        .left
+        .iter()
+        .chain(tournament.bracket.right.iter())
+        .flat_map(|round| round.matches.iter())
+        .chain(std::iter::once(&tournament.bracket.final_match))
+        .chain(std::iter::once(&tournament.bracket.third_place))
+        .find(|match_data| {
+            let participants = s1_match_participant_slots(tournament, match_data);
+            participants.contains(&left_slot) && participants.contains(&right_slot)
+        })
+        .map(|match_data| match_data.id.clone())
+}
+
+fn s1_all_required_matches_completed(tournament: &S1TournamentFile) -> bool {
+    tournament.bracket.final_match.status == "completed"
+        && tournament.bracket.third_place.status == "completed"
+}
+
+fn apply_s1_match_result(
+    tournament: &mut S1TournamentFile,
+    roster: &S1RosterFile,
+    input: &S1MatchResultInput,
+) -> Result<S1MatchRecordResult, String> {
+    if input.winner_character_id != input.left_character_id
+        && input.winner_character_id != input.right_character_id
+    {
+        return Err("胜者不属于本场对局。".to_string());
+    }
+
+    let left_slot = s1_roster_slot_for_character(roster, &input.left_character_id)?;
+    let right_slot = s1_roster_slot_for_character(roster, &input.right_character_id)?;
+    let winner_slot = s1_roster_slot_for_character(roster, &input.winner_character_id)?;
+    let loser_slot = if winner_slot == left_slot {
+        right_slot
+    } else {
+        left_slot
+    };
+
+    let match_id = find_s1_match_for_slots(tournament, left_slot, right_slot)
+        .ok_or_else(|| "没有找到包含这两个席位的 S1 对局。".to_string())?;
+    let updated_at = now_iso();
+    let target = find_s1_match_mut(tournament, &match_id)
+        .ok_or_else(|| format!("没有找到 S1 对局: {}", match_id))?;
+
+    target.status = "completed".to_string();
+    target.winner_slot = Some(winner_slot);
+    target.loser_slot = Some(loser_slot);
+    target.replay_id = if input.replay_id.trim().is_empty() {
+        None
+    } else {
+        Some(input.replay_id.trim().to_string())
+    };
+    target.updated_at = updated_at.clone();
+
+    if match_id == tournament.bracket.final_match.id {
+        tournament.placements.champion_slot = Some(winner_slot);
+        tournament.placements.runner_up_slot = Some(loser_slot);
+    } else if match_id == tournament.bracket.third_place.id {
+        tournament.placements.third_place_slot = Some(winner_slot);
+        tournament.placements.fourth_place_slot = Some(loser_slot);
+    }
+
+    tournament.status = if s1_all_required_matches_completed(tournament) {
+        "completed".to_string()
+    } else {
+        "running".to_string()
+    };
+    tournament.updated_at = updated_at.clone();
+
+    Ok(S1MatchRecordResult {
+        match_id,
+        winner_slot,
+        loser_slot,
+        updated_at,
+    })
+}
+
+fn package_source_path(package: &OfficialImportPackage) -> String {
+    package
+        .source
+        .as_ref()
+        .and_then(|source| source.get("path"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn package_checksum(package: &OfficialImportPackage) -> String {
+    package
+        .source
+        .as_ref()
+        .and_then(|source| source.get("checksum"))
+        .and_then(|checksum| {
+            checksum
+                .get("calculated")
+                .or_else(|| checksum.get("stored"))
+                .and_then(Value::as_str)
+        })
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn requested_s1_roster_slot(package: &OfficialImportPackage) -> Result<Option<usize>, String> {
+    let Some(roster) = package.roster.as_ref() else {
+        return Ok(None);
+    };
+
+    if !roster.season.trim().is_empty() && roster.season.trim() != S1_ROSTER_SEASON {
+        return Err(format!("官方包赛季不是 S1: {}", roster.season));
+    }
+
+    Ok(roster
+        .slot
+        .filter(|slot| (1..=S1_ROSTER_SIZE).contains(slot)))
+}
+
+fn select_s1_roster_slot(
+    roster: &S1RosterFile,
+    character_id: &str,
+    requested_slot: Option<usize>,
+) -> Result<usize, String> {
+    if let Some(existing) = roster
+        .slots
+        .iter()
+        .find(|slot| slot.character_id == character_id)
+    {
+        return Ok(existing.slot);
+    }
+
+    if let Some(slot) = requested_slot {
+        return Ok(slot);
+    }
+
+    roster
+        .slots
+        .iter()
+        .find(|slot| slot.status == "empty" || slot.character_id.trim().is_empty())
+        .map(|slot| slot.slot)
+        .ok_or_else(|| "S1 名单已满，无法自动登记。".to_string())
+}
+
+fn upsert_s1_roster_asset(
+    base_dir: &Path,
+    package: &OfficialImportPackage,
+    character: &Character,
+    overwrite: bool,
+) -> Result<(S1RosterFile, PathBuf), String> {
+    let mut roster = read_s1_roster_file(base_dir)?;
+    let requested_slot = requested_s1_roster_slot(package)?;
+    let slot = select_s1_roster_slot(&roster, &character.id, requested_slot)?;
+    let target_index = slot - 1;
+    let current = &roster.slots[target_index];
+
+    if !current.character_id.trim().is_empty() && current.character_id != character.id && !overwrite
+    {
+        return Err(format!(
+            "S1 名单席位 #{} 已被 {} 占用，未开启覆盖。",
+            slot, current.character_id
+        ));
+    }
+
+    let updated_at = now_iso();
+    roster.updated_at = updated_at.clone();
+    roster.slots[target_index] = S1RosterSlot {
+        slot,
+        status: "imported".to_string(),
+        character_id: character.id.clone(),
+        character_name: character.name.clone(),
+        project_name: character.project_name.clone().unwrap_or_default(),
+        creator: character.creator.clone(),
+        source_path: package_source_path(package),
+        review_decision: "approved".to_string(),
+        official_notes: package.review.official_notes.trim().to_string(),
+        checksum: package_checksum(package),
+        review_package_status: if package.review.base_status.trim().is_empty() {
+            "base_rules_passed".to_string()
+        } else {
+            package.review.base_status.trim().to_string()
+        },
+        updated_at,
+    };
+
+    let path = write_s1_roster_file(base_dir, &roster)?;
+    Ok((roster, path))
+}
+
+fn ensure_can_upsert_s1_roster_asset(
+    base_dir: &Path,
+    package: &OfficialImportPackage,
+    character: &Character,
+    overwrite: bool,
+) -> Result<(), String> {
+    let roster = read_s1_roster_file(base_dir)?;
+    let requested_slot = requested_s1_roster_slot(package)?;
+    let slot = select_s1_roster_slot(&roster, &character.id, requested_slot)?;
+    let current = &roster.slots[slot - 1];
+
+    if !current.character_id.trim().is_empty() && current.character_id != character.id && !overwrite
+    {
+        return Err(format!(
+            "S1 名单席位 #{} 已被 {} 占用，未开启覆盖。",
+            slot, current.character_id
+        ));
+    }
+
+    Ok(())
+}
+
+fn public_s1_roster_slot(mut slot: S1RosterSlot) -> S1RosterSlot {
+    let public_status = match slot.status.as_str() {
+        "approved" | "imported" | "trained" => slot.status.clone(),
+        "pending_review" => "pending_review".to_string(),
+        _ => "empty".to_string(),
+    };
+
+    if public_status == "empty" || public_status == "pending_review" {
+        slot.character_id.clear();
+        slot.character_name.clear();
+        slot.project_name.clear();
+        slot.creator.clear();
+        slot.updated_at.clear();
+    }
+
+    slot.status = public_status;
+    slot.source_path.clear();
+    slot.review_decision = if matches!(slot.status.as_str(), "approved" | "imported" | "trained") {
+        "approved".to_string()
+    } else {
+        "pending".to_string()
+    };
+    slot.official_notes.clear();
+    slot.checksum.clear();
+    slot.review_package_status.clear();
+    slot
 }
 
 fn is_file_safe_asset_id(value: &str) -> bool {
@@ -464,6 +1050,46 @@ pub fn validate_assets() -> Result<AssetValidationReport, String> {
 }
 
 #[tauri::command]
+pub fn list_s1_roster() -> Result<Vec<S1RosterSlot>, String> {
+    Ok(read_s1_roster_file(&runtime_assets_dir())?.slots)
+}
+
+#[tauri::command]
+pub fn list_s1_public_roster() -> Result<Vec<S1RosterSlot>, String> {
+    Ok(read_s1_roster_file(&runtime_assets_dir())?
+        .slots
+        .into_iter()
+        .map(public_s1_roster_slot)
+        .collect())
+}
+
+#[tauri::command]
+pub fn get_s1_tournament() -> Result<Value, String> {
+    read_s1_tournament_file(&runtime_assets_dir())
+}
+
+#[tauri::command]
+pub fn record_s1_match_result(input: S1MatchResultInput) -> Result<S1MatchRecordResult, String> {
+    let asset_dirs = official_asset_dirs();
+    let mut prepared_updates = Vec::new();
+
+    for dir in &asset_dirs {
+        let roster = read_s1_roster_file(dir)?;
+        let mut tournament = read_s1_tournament_struct(dir)?;
+        let result = apply_s1_match_result(&mut tournament, &roster, &input)?;
+        prepared_updates.push((dir.clone(), tournament, result));
+    }
+
+    let mut latest_result = None;
+    for (dir, tournament, result) in prepared_updates {
+        write_s1_tournament_file(&dir, &tournament)?;
+        latest_result = Some(result);
+    }
+
+    latest_result.ok_or_else(|| "没有可写入的 S1 赛事资源目录。".to_string())
+}
+
+#[tauri::command]
 pub fn import_official_package(
     payload: Value,
     overwrite: bool,
@@ -550,9 +1176,11 @@ pub fn import_official_package(
         if let Some(passive_id) = passive_id.as_ref() {
             ensure_can_write_asset(dir, "passives", passive_id, overwrite)?;
         }
+        ensure_can_upsert_s1_roster_asset(dir, &package, &character, overwrite)?;
     }
 
     let mut written_files = Vec::new();
+    let mut latest_roster = None;
     for dir in &asset_dirs {
         written_files.push(
             write_json_asset(
@@ -580,6 +1208,10 @@ pub fn import_official_package(
                     .to_string(),
             );
         }
+
+        let (roster, roster_path) = upsert_s1_roster_asset(dir, &package, &character, overwrite)?;
+        written_files.push(roster_path.display().to_string());
+        latest_roster = Some(roster);
     }
 
     Ok(OfficialImportResult {
@@ -588,6 +1220,7 @@ pub fn import_official_package(
         passive_id,
         written_files,
         validation,
+        roster: latest_roster.unwrap_or_else(empty_s1_roster_file).slots,
     })
 }
 
@@ -631,6 +1264,8 @@ pub fn init_battle(config: BattleConfig) -> Result<String, String> {
     let session = BattleSession {
         engine,
         rng,
+        char_a_id: char_a.id.clone(),
+        char_b_id: char_b.id.clone(),
         char_a_name: char_a.name.clone(),
         char_b_name: char_b.name.clone(),
         turns: Vec::new(),
@@ -734,7 +1369,7 @@ pub fn step_battle(session_id: String) -> Result<TurnRecord, String> {
 
 #[tauri::command]
 pub fn finish_battle(session_id: String) -> Result<BattleCommandResult, String> {
-    let (winner, loss_reason, turns, rounds_played, final_hp_a, final_hp_b) = {
+    let (winner, winner_character_id, loss_reason, turns, rounds_played, final_hp_a, final_hp_b) = {
         let sessions = SESSIONS.lock().unwrap();
         let session = sessions.get(&session_id).ok_or("Session not found")?;
 
@@ -742,6 +1377,13 @@ pub fn finish_battle(session_id: String) -> Result<BattleCommandResult, String> 
             .engine
             .get_winner()
             .unwrap_or_else(|| "draw".to_string());
+        let winner_character_id = if winner == session.char_a_name {
+            session.char_a_id.clone()
+        } else if winner == session.char_b_name {
+            session.char_b_id.clone()
+        } else {
+            String::new()
+        };
         let rounds_played = session
             .turns
             .last()
@@ -763,6 +1405,7 @@ pub fn finish_battle(session_id: String) -> Result<BattleCommandResult, String> 
 
         (
             winner,
+            winner_character_id,
             loss_reason,
             session.turns.clone(),
             rounds_played,
@@ -789,6 +1432,7 @@ pub fn finish_battle(session_id: String) -> Result<BattleCommandResult, String> 
 
     Ok(BattleCommandResult {
         winner,
+        winner_character_id,
         rounds_played,
         turns_played: turns.len() as i32,
         final_hp_a,
@@ -873,11 +1517,24 @@ mod tests {
         );
 
         let characters = list_characters().expect("characters should load");
+        let roster = list_s1_roster().expect("S1 roster should load");
+        let public_roster = list_s1_public_roster().expect("public S1 roster should load");
+        let tournament = get_s1_tournament().expect("S1 tournament should load");
         let arenas = list_arenas().expect("arenas should load");
         let rulesets = list_rulesets().expect("rulesets should load");
         let skills = list_skills().expect("skills should load");
 
         assert!(!characters.is_empty());
+        assert_eq!(roster.len(), S1_ROSTER_SIZE);
+        assert_eq!(public_roster.len(), S1_ROSTER_SIZE);
+        assert!(roster.iter().any(|slot| slot.character_id == "dcpe_sans"));
+        assert_eq!(tournament.get("season").and_then(Value::as_str), Some("S1"));
+        assert!(public_roster.iter().all(|slot| {
+            slot.source_path.is_empty()
+                && slot.official_notes.is_empty()
+                && slot.checksum.is_empty()
+                && slot.review_package_status.is_empty()
+        }));
         assert!(!arenas.is_empty());
         assert!(!rulesets.is_empty());
         assert!(!skills.is_empty());

@@ -53,19 +53,19 @@
 @keyframes aurora-left {
   0%,
   100% {
-    opacity: 0.3;
+    opacity: calc(var(--uce-effect-strength, 1) * 0.3);
   }
   50% {
-    opacity: 1;
+    opacity: var(--uce-effect-strength, 1);
   }
 }
 
 @keyframes aurora-right {
   0%,
   100% {
-    opacity: 0.3;
+    opacity: calc(var(--uce-effect-strength, 1) * 0.3);
   }
   50% {
-    opacity: 1;
+    opacity: var(--uce-effect-strength, 1);
   }
 }
