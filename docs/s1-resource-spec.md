@@ -28,13 +28,13 @@ The desktop app reads resources from `assets/`. Run `npm run sync:assets` after 
 
 ## 参赛者提交包 / Participant Submission Package
 
-UCE v0.1.2 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件。`.ucechar` 是参赛者提交给赛事官方的角色信息包，不是最终 AI 模型，也不是官方比赛资源库中的最终 `assets/characters/*.json` 文件。
+UCE v0.1.3 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件。`.ucechar` 是参赛者提交给赛事官方的角色信息包，不是最终 AI 模型，也不是官方比赛资源库中的最终 `assets/characters/*.json` 文件。
 
 `.ucechar` 文件包含：
 
 - `package_type: "uce_character_submission"`
-- `schema_version: "0.1.2"`
-- `engine_version: "0.1.2"`
+- `schema_version: "0.1.3"`
+- `engine_version: "0.1.3"`
 - `target_season: "S1"`
 - `ruleset_version: "0.1.0"`
 - `season_template`：记录当前角色设计模板 ID、名称、规则版本和角色默认值；后续赛季可以拥有独立模板。
@@ -44,7 +44,7 @@ UCE v0.1.2 的参赛者发行版会从角色设计页面导出 `.ucechar` 文件
 
 官方收到 `.ucechar` 后，需要进行规则审核、被动/DEBUFF/反击设计审核，再决定是否导入到官方比赛资源库。
 
-UCE v0.1.2 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
+UCE v0.1.3 participant builds export `.ucechar` files from Character Forge. A `.ucechar` file is the participant submission package sent to tournament officials. It is not the final AI model and not the final `assets/characters/*.json` resource used by the official tournament library.
 
 After receiving a `.ucechar` file, officials should review rule compliance, custom passive effects, debuffs, and counter designs before importing the character into the official tournament resource library.
 
@@ -75,10 +75,10 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 `assets/tournaments/S1.json` 用于记录 S1 赛事对阵、对局状态和最终名次。
 
 - The bracket is split into left and right halves.
-- The first round references roster slots directly.
+- The first round receives randomized roster slots only after all 32 valid roster slots are filled and officials generate the bracket draw.
 - Later rounds reference source match IDs.
 - `placements` stores champion, runner-up, third place, and fourth place slot IDs.
-- The current file starts in `preparing` state and can be updated later by official match results.
+- The current file starts in `preparing` state. Public bracket participants remain hidden until the tournament reaches `seeded`, `running`, or `completed`.
 - Official S1 battle results write `winnerSlot`, `loserSlot`, optional `replayId`, and `updatedAt` to the matched bracket entry.
 - Later rounds resolve entrants from their `sources`; `MATCH_ID` means the source winner, and `MATCH_ID:loser` means the source loser.
 - Sandbox Battle Simulation is not an official tournament match. Only the tournament battle flow should write official match results.
@@ -98,7 +98,11 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 
 ```json
 {
-  "id": "example_fighter",
+  "id": null,
+  "id_scope": "season_contestant",
+  "season_contestant_id": null,
+  "season_contestant_id_status": "pending_assignment",
+  "permanent_character_id": null,
   "project_name": "Example AU Project",
   "name": "S1 Example Fighter",
   "creator": "creator_name",
@@ -106,24 +110,30 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
   "hp": 500,
   "mp": 250,
   "skills": {
-    "melee": "example_melee",
-    "ranged": "example_ranged",
-    "block": "example_block",
-    "dodge": "example_dodge",
+    "melee": "pending_character_melee",
+    "ranged": "pending_character_ranged",
+    "block": "pending_character_block",
+    "dodge": "pending_character_dodge",
     "passive": null
   },
   "passive": null
 }
 ```
 
-- `id`：唯一且适合文件名的资源 ID；参赛者界面会自动生成，官方审核后可再决定最终写入 ID。
+- `id`：参赛者提交阶段使用 `null`。官方审核通过并登记赛季名单时，写入当季的赛季参赛选手 ID。
+- `id_scope`：当前赛事资源使用 `season_contestant`，表示 `id` 只用于本赛季比赛。
+- `season_contestant_id`：赛季参赛选手 ID。每个赛季单独分配，只服务于本季参赛名单、赛事对战和晋级数据。
+- `season_contestant_id_status`：参赛者提交阶段为 `pending_assignment`；官方登记后为 `assigned`。
+- `permanent_character_id`：永久角色 ID。参赛阶段与普通赛季资源默认为 `null`；只有当角色设计被长期收录到引擎/游戏内容中时，才由官方另行分配。
 - `project_name`：同人项目名称。
 - `name`：角色名，建议使用“项目简称 + 角色名”的常用称呼，例如 `TS!Sans`。
 - `hp`：S1 固定为 500，不允许玩家手动修改。
 - `mp`：S1 固定为 250，不允许玩家手动修改。
-- `skills.melee/ranged/block/dodge`：必须引用对应类型的技能。
-- `skills.passive`：没有被动时使用 `null`；存在被动时必须等于 `passive.id`。
+- `skills.melee/ranged/block/dodge`：由程序自动生成并引用对应类型技能；参赛者不填写资源 ID。
+- `skills.passive`：没有被动时使用 `null`；存在被动时由程序自动引用 `passive.id`。
 - `passive`：没有被动时使用 `null`；存在被动时填写单一被动效果对象。
+- 参赛者提交阶段的技能 ID 使用程序生成的 draft ID；官方导出阶段会按赛季参赛选手 ID 重写为 `赛季参赛选手ID_melee`、`赛季参赛选手ID_ranged`、`赛季参赛选手ID_block`、`赛季参赛选手ID_dodge` 和 `赛季参赛选手ID_passive`。
+- 同一角色如果参加后续赛季，需要重新提交并分配新的赛季参赛选手 ID；这不会自动等同于永久角色 ID。
 
 ### 全局模拟
 
@@ -153,7 +163,7 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 
 ```json
 {
-  "id": "example_melee",
+  "id": "pending_character_melee",
   "name": "Example Slash",
   "type": "melee",
   "mp_cost": 0,
@@ -178,7 +188,7 @@ After receiving a `.ucechar` file, officials should review rule compliance, cust
 
 ```json
 {
-  "id": "example_ranged",
+  "id": "pending_character_ranged",
   "name": "Example Bolt",
   "type": "ranged",
   "mp_cost": 50,
@@ -260,10 +270,11 @@ dash_counter = round5(clamp(25 + 15 + counter_damage / 75 * 35, 40, 80))
 
 ```json
 {
-  "id": "example_passive",
+  "id": "pending_character_passive",
   "name": "Example Passive",
   "type": "passive",
   "timing": "before_simulation_persistent",
+  "execution_status": "pending_code_mapping",
   "single_effect": true,
   "official_review_required": true,
   "effect": {
@@ -282,6 +293,7 @@ S1 被动限制：
 
 - 被动必须设置 `single_effect: true`。
 - 被动必须设置 `official_review_required: true`。
+- `execution_status` 默认为 `pending_code_mapping`，表示该被动目前是审核描述，尚未映射到可执行战斗逻辑。
 - `effect` 必须是一个对象，不能是数组。
 - `effect.category`、`effect.name`、`effect.description` 必须填写。
 - 平衡性说明不由参赛者填写，由赛事官方在审核阶段判断。
@@ -293,14 +305,20 @@ S1 被动限制：
 
 ### Character Resource
 
-- `id`: unique file-safe resource ID. Participant builds generate a draft ID; officials may decide the final written ID during review.
+- `id`: use `null` during participant submission. When officials register the character to a season roster, this becomes the season contestant ID.
+- `id_scope`: season tournament resources use `season_contestant`, meaning `id` is scoped to that season's competition.
+- `season_contestant_id`: season contestant ID. It is assigned per season and is used only by the season roster, tournament battle flow, and advancement data.
+- `season_contestant_id_status`: `pending_assignment` during participant submission and `assigned` after official registration.
+- `permanent_character_id`: permanent character ID. It remains `null` for normal seasonal submissions and is assigned only if the character is permanently accepted into engine/game content.
 - `project_name`: fan project name.
 - `name`: character name. Prefer the common "project abbreviation + character name" form, such as `TS!Sans`.
 - `hp`: fixed at 500 for S1. Players cannot manually change it.
 - `mp`: fixed at 250 for S1. Players cannot manually change it.
-- `skills.melee/ranged/block/dodge`: must reference a skill of the matching type.
-- `skills.passive`: use `null` when there is no passive; when a passive exists, it must match `passive.id`.
+- `skills.melee/ranged/block/dodge`: generated by the program and linked to the matching skill type. Participants do not enter resource IDs.
+- `skills.passive`: use `null` when there is no passive; when a passive exists, the program links it to `passive.id`.
 - `passive`: use `null` when there is no passive; otherwise define one single passive effect object.
+- Participant submissions use program-generated draft skill IDs. Official export rewrites them to `seasonContestantId_melee`, `seasonContestantId_ranged`, `seasonContestantId_block`, `seasonContestantId_dodge`, and `seasonContestantId_passive`.
+- If the same character joins a later season, it must be submitted again and receive a new season contestant ID. This is separate from any future permanent character ID.
 
 ### Global Simulation
 
@@ -402,10 +420,11 @@ Example:
 
 ```json
 {
-  "id": "example_passive",
+  "id": "pending_character_passive",
   "name": "Example Passive",
   "type": "passive",
   "timing": "before_simulation_persistent",
+  "execution_status": "pending_code_mapping",
   "single_effect": true,
   "official_review_required": true,
   "effect": {
@@ -424,6 +443,7 @@ S1 passive limits:
 
 - Passive must set `single_effect: true`.
 - Passive must set `official_review_required: true`.
+- `execution_status` defaults to `pending_code_mapping`, meaning the passive is review text until mapped to executable battle logic.
 - `effect` must be one object, not an array.
 - `effect.category`, `effect.name`, and `effect.description` are required.
 - Balance notes are not written by participants; tournament officials judge balance during review.

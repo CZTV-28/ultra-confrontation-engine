@@ -141,6 +141,10 @@ function notifyRosterUpdated() {
   }
 }
 
+function isTauriRuntime() {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
 export function createEmptyS1Roster(): S1RosterSlot[] {
   return Array.from({ length: S1_ROSTER_SIZE }, (_, index) => createEmptySlot(index + 1));
 }
@@ -158,6 +162,30 @@ export function normalizeS1Roster(value: unknown): S1RosterSlot[] {
   });
 
   return emptyRoster.map((slot) => bySlot.get(slot.slot) ?? slot);
+}
+
+function slotUpdatedAtValue(slot: S1RosterSlot) {
+  const value = Date.parse(slot.updatedAt);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function mergeS1Roster(localRoster: S1RosterSlot[], sourceRoster: S1RosterSlot[]): S1RosterSlot[] {
+  const local = normalizeS1Roster(localRoster);
+  const source = normalizeS1Roster(sourceRoster);
+
+  return source.map((sourceSlot, index) => {
+    const localSlot = local[index];
+    if (!localSlot?.characterId.trim()) {
+      if (sourceSlot.characterId.trim() && slotUpdatedAtValue(localSlot) > slotUpdatedAtValue(sourceSlot)) {
+        return localSlot;
+      }
+      return sourceSlot;
+    }
+    if (!sourceSlot.characterId.trim()) {
+      return localSlot;
+    }
+    return slotUpdatedAtValue(sourceSlot) > slotUpdatedAtValue(localSlot) ? sourceSlot : localSlot;
+  });
 }
 
 export function sanitizeS1RosterForPublic(roster: S1RosterSlot[]): S1RosterSlot[] {
@@ -205,13 +233,15 @@ export function readS1Roster(): S1RosterSlot[] {
 }
 
 export async function loadS1Roster(): Promise<S1RosterSlot[]> {
+  const localRoster = readS1Roster();
   try {
     const { invoke } = await import("@tauri-apps/api/core");
-    const roster = normalizeS1Roster(await invoke<unknown>("list_s1_roster"));
+    const sourceRoster = normalizeS1Roster(await invoke<unknown>("list_s1_roster"));
+    const roster = mergeS1Roster(localRoster, sourceRoster);
     writeS1Roster(roster, false);
     return roster;
   } catch {
-    return readS1Roster();
+    return localRoster;
   }
 }
 
@@ -273,6 +303,47 @@ export function upsertS1RosterEntry(input: S1RosterEntryInput): S1RosterSlot[] {
 
   writeS1Roster(nextRoster);
   return nextRoster;
+}
+
+export function clearS1RosterEntry(slot: number): S1RosterSlot[] {
+  const roster = readS1Roster();
+  const safeSlot = Math.min(S1_ROSTER_SIZE, Math.max(1, Math.trunc(slot)));
+  const nextRoster = [...roster];
+  nextRoster[safeSlot - 1] = {
+    ...createEmptySlot(safeSlot),
+    updatedAt: new Date().toISOString(),
+  };
+
+  writeS1Roster(nextRoster);
+  return nextRoster;
+}
+
+export async function saveS1RosterEntry(input: S1RosterEntryInput): Promise<S1RosterSlot[]> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const roster = normalizeS1Roster(await invoke<unknown>("upsert_s1_roster_slot", { input }));
+    writeS1Roster(roster);
+    return roster;
+  } catch (error) {
+    if (isTauriRuntime()) {
+      throw error;
+    }
+    return upsertS1RosterEntry(input);
+  }
+}
+
+export async function removeS1RosterEntry(slot: number): Promise<S1RosterSlot[]> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const roster = normalizeS1Roster(await invoke<unknown>("clear_s1_roster_slot", { slot }));
+    writeS1Roster(roster);
+    return roster;
+  } catch (error) {
+    if (isTauriRuntime()) {
+      throw error;
+    }
+    return clearS1RosterEntry(slot);
+  }
 }
 
 export function updateS1RosterEntryStatus(characterId: string, status: S1RosterStatus): S1RosterSlot[] {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
 import {
@@ -76,10 +76,30 @@ interface PortraitDraft {
   dataUrl: string;
 }
 
+interface CreatorDraftSnapshot {
+  schemaVersion: 1;
+  savedAt: string;
+  selectedSeasonId: SeasonId;
+  activeSkill: SkillKind;
+  projectName: string;
+  characterName: string;
+  creator: string;
+  description: string;
+  trainingNotes: string;
+  portrait: PortraitDraft;
+  basic: BasicDraft;
+  melee: MeleeDraft;
+  ranged: RangedDraft;
+  block: BlockDraft;
+  dodge: DodgeDraft;
+  passive: PassiveDraft;
+}
+
 const skillKinds: SkillKind[] = ["basic", "melee", "ranged", "block", "dodge", "passive"];
 
-const UCE_VERSION = "0.1.2";
-const CHARACTER_SCHEMA_VERSION = "0.1.2";
+const UCE_VERSION = "0.1.3";
+const CHARACTER_SCHEMA_VERSION = "0.1.3";
+const CREATOR_DRAFT_STORAGE_KEY = "uce:creator:draft:v1";
 
 const copy = {
   zh: {
@@ -93,9 +113,9 @@ const copy = {
     preview: "资源预览",
     export: "导出 .ucechar",
     exported: "已导出参赛角色文件。",
+    draftRestored: "已恢复上次未完成的角色草稿。",
     exportFailed: "导出失败，请在 Tauri 桌面端运行并确认文件权限。",
     fixIssues: "需要先修正红色校验项。",
-    id: "资源 ID",
     projectName: "项目名称",
     name: "角色名",
     creator: "作者",
@@ -166,9 +186,9 @@ const copy = {
     preview: "Resource Preview",
     export: "Export .ucechar",
     exported: "Participant character file exported.",
+    draftRestored: "Restored the previous unfinished character draft.",
     exportFailed: "Export failed. Run inside the Tauri desktop app and check file permissions.",
     fixIssues: "Fix red validation items before exporting.",
-    id: "Resource ID",
     projectName: "Project Name",
     name: "Name",
     creator: "Creator",
@@ -237,6 +257,26 @@ function normalizeId(value: string) {
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function safeFileStem(value: string) {
+  const stem = value
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "_")
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "")
+    .slice(0, 80);
+  return stem || "uce_character_submission";
+}
+
+function resourceIdWithSuffix(prefix: string, suffix: string) {
+  const safeSuffix = normalizeId(suffix) || "resource";
+  const fallbackPrefix = "pending_character";
+  const maxPrefixLength = Math.max(1, 64 - safeSuffix.length - 1);
+  const safePrefix = (normalizeId(prefix) || fallbackPrefix)
+    .slice(0, maxPrefixLength)
+    .replace(/[-_]+$/g, "") || fallbackPrefix.slice(0, maxPrefixLength);
+  return `${safePrefix}_${safeSuffix}`;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -340,6 +380,67 @@ function isTypingTarget(target: EventTarget | null) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSeasonId(value: unknown): value is SeasonId {
+  return typeof value === "string" && seasonTemplates.some((template) => template.id === value);
+}
+
+function isSkillKind(value: unknown): value is SkillKind {
+  return typeof value === "string" && skillKinds.includes(value as SkillKind);
+}
+
+function readCreatorDraft() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawDraft = window.localStorage.getItem(CREATOR_DRAFT_STORAGE_KEY);
+    if (!rawDraft) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawDraft) as unknown;
+    if (!isRecord(parsed) || parsed.schemaVersion !== 1 || !isSeasonId(parsed.selectedSeasonId)) {
+      return null;
+    }
+
+    return {
+      ...(parsed as unknown as CreatorDraftSnapshot),
+      activeSkill: isSkillKind(parsed.activeSkill) ? parsed.activeSkill : "basic",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCreatorDraft(snapshot: CreatorDraftSnapshot) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(CREATOR_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    const lightweightSnapshot: CreatorDraftSnapshot = {
+      ...snapshot,
+      portrait: {
+        fileName: "",
+        mimeType: "",
+        dataUrl: "",
+      },
+    };
+    try {
+      window.localStorage.setItem(CREATOR_DRAFT_STORAGE_KEY, JSON.stringify(lightweightSnapshot));
+    } catch {
+      // Ignore storage errors; the editor should keep working even when persistence is unavailable.
+    }
+  }
+}
+
 function fileNameFromPath(path: string) {
   return path.split(/[\\/]/).pop() || "portrait";
 }
@@ -377,25 +478,28 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   const { i18n } = useTranslation();
   const lang: Language = i18n.language.startsWith("en") ? "en" : "zh";
   const t = copy[lang];
-  const [selectedSeasonId, setSelectedSeasonId] = useState<SeasonId>("S1");
+  const savedDraft = useMemo(() => readCreatorDraft(), []);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<SeasonId>(savedDraft?.selectedSeasonId ?? "S1");
   const seasonTemplate = useMemo(() => getSeasonTemplate(selectedSeasonId), [selectedSeasonId]);
   const seasonDraft = seasonTemplate.draftDefaults[lang];
 
-  const [projectName, setProjectName] = useState(seasonDraft.projectName);
-  const [characterName, setCharacterName] = useState(seasonDraft.characterName);
-  const [creator, setCreator] = useState("creator_name");
-  const [description, setDescription] = useState(seasonDraft.description);
-  const [trainingNotes, setTrainingNotes] = useState(seasonDraft.trainingNotes);
-  const [portrait, setPortrait] = useState<PortraitDraft>({
+  const [projectName, setProjectName] = useState(savedDraft?.projectName ?? seasonDraft.projectName);
+  const [characterName, setCharacterName] = useState(savedDraft?.characterName ?? seasonDraft.characterName);
+  const [creator, setCreator] = useState(savedDraft?.creator ?? "creator_name");
+  const [description, setDescription] = useState(savedDraft?.description ?? seasonDraft.description);
+  const [trainingNotes, setTrainingNotes] = useState(savedDraft?.trainingNotes ?? seasonDraft.trainingNotes);
+  const [portrait, setPortrait] = useState<PortraitDraft>(savedDraft?.portrait ?? {
     fileName: "",
     mimeType: "",
     dataUrl: "",
   });
   const hp = seasonTemplate.characterDefaults.hp;
   const mp = seasonTemplate.characterDefaults.mp;
-  const [activeSkill, setActiveSkill] = useState<SkillKind>("basic");
-  const [basic, setBasic] = useState<BasicDraft>({ maxMpSpend: seasonTemplate.skillDefaults.basic.maxMpSpend });
-  const [melee, setMelee] = useState<MeleeDraft>({
+  const [activeSkill, setActiveSkill] = useState<SkillKind>(savedDraft?.activeSkill ?? "basic");
+  const [basic, setBasic] = useState<BasicDraft>(savedDraft?.basic ?? {
+    maxMpSpend: seasonTemplate.skillDefaults.basic.maxMpSpend,
+  });
+  const [melee, setMelee] = useState<MeleeDraft>(savedDraft?.melee ?? {
     id: seasonTemplate.skillDefaults.melee.id,
     name: seasonTemplate.skillDefaults.melee.name,
     mode: "damage",
@@ -404,27 +508,27 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     debuffName: "",
     debuffEffect: "",
   });
-  const [ranged, setRanged] = useState<RangedDraft>({
+  const [ranged, setRanged] = useState<RangedDraft>(savedDraft?.ranged ?? {
     id: seasonTemplate.skillDefaults.ranged.id,
     name: seasonTemplate.skillDefaults.ranged.name,
     damage: seasonTemplate.skillDefaults.ranged.damage,
     hitRate: seasonTemplate.skillDefaults.ranged.hitRate,
     range: seasonTemplate.skillDefaults.ranged.range,
   });
-  const [block, setBlock] = useState<BlockDraft>({
+  const [block, setBlock] = useState<BlockDraft>(savedDraft?.block ?? {
     id: seasonTemplate.skillDefaults.block.id,
     name: seasonTemplate.skillDefaults.block.name,
     damageReduction: seasonTemplate.block.defaultReduction,
     perfectCounter: false,
     counterDamage: seasonTemplate.skillDefaults.block.counterDamage,
   });
-  const [dodge, setDodge] = useState<DodgeDraft>({
+  const [dodge, setDodge] = useState<DodgeDraft>(savedDraft?.dodge ?? {
     id: seasonTemplate.skillDefaults.dodge.id,
     name: seasonTemplate.skillDefaults.dodge.name,
     mode: "normal",
     counterDamage: seasonTemplate.skillDefaults.dodge.counterDamage,
   });
-  const [passive, setPassive] = useState<PassiveDraft>({
+  const [passive, setPassive] = useState<PassiveDraft>(savedDraft?.passive ?? {
     id: seasonTemplate.skillDefaults.passive.id,
     name: seasonTemplate.skillDefaults.passive.name,
     mode: "none",
@@ -436,7 +540,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     effectDescription: "",
     description: "",
   });
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(savedDraft ? t.draftRestored : "");
 
   const applySeasonTemplate = (seasonId: SeasonId) => {
     const nextTemplate = getSeasonTemplate(seasonId);
@@ -493,7 +597,17 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     setStatus("");
   };
 
-  const resourceId = normalizeId(`${projectName}_${characterName}`);
+  const submissionFileStem = safeFileStem(`${projectName.trim()}_${characterName.trim()}`);
+  const generatedSkillIds = useMemo(
+    () => ({
+      melee: resourceIdWithSuffix(`${projectName}_${characterName}`, "melee"),
+      ranged: resourceIdWithSuffix(`${projectName}_${characterName}`, "ranged"),
+      block: resourceIdWithSuffix(`${projectName}_${characterName}`, "block"),
+      dodge: resourceIdWithSuffix(`${projectName}_${characterName}`, "dodge"),
+      passive: resourceIdWithSuffix(`${projectName}_${characterName}`, "passive"),
+    }),
+    [characterName, projectName],
+  );
   const rangedCost = rangedMpCost(ranged, seasonTemplate);
   const blockCost = blockMpCost(block, seasonTemplate);
   const dodgeCost = dodgeMpCost(dodge, seasonTemplate);
@@ -504,10 +618,11 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     }
 
     return {
-      id: normalizeId(passive.id),
+      id: generatedSkillIds.passive,
       name: passive.name.trim(),
       type: "passive",
       timing: "before_simulation_persistent",
+      execution_status: "pending_code_mapping",
       single_effect: true,
       effect: {
         category: passive.effectCategory.trim(),
@@ -520,11 +635,15 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       official_review_required: true,
       description: passive.description.trim(),
     };
-  }, [passive]);
+  }, [generatedSkillIds.passive, passive]);
 
   const characterResource = useMemo(
     () => ({
-      id: resourceId,
+      id: null,
+      id_scope: "season_contestant",
+      season_contestant_id: null,
+      season_contestant_id_status: "pending_assignment",
+      permanent_character_id: null,
       project_name: projectName.trim(),
       name: characterName.trim(),
       creator: creator.trim(),
@@ -539,30 +658,29 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       hp,
       mp,
       skills: {
-        melee: normalizeId(melee.id),
-        ranged: normalizeId(ranged.id),
-        block: normalizeId(block.id),
-        dodge: normalizeId(dodge.id),
+        melee: generatedSkillIds.melee,
+        ranged: generatedSkillIds.ranged,
+        block: generatedSkillIds.block,
+        dodge: generatedSkillIds.dodge,
         passive: passiveResource?.id ?? null,
       },
       passive: passiveResource,
     }),
     [
-      block.id,
       characterName,
       creator,
       description,
-      dodge.id,
+      generatedSkillIds.block,
+      generatedSkillIds.dodge,
+      generatedSkillIds.melee,
+      generatedSkillIds.ranged,
       hp,
-      melee.id,
       mp,
       passiveResource,
       portrait.dataUrl,
       portrait.fileName,
       portrait.mimeType,
       projectName,
-      ranged.id,
-      resourceId,
     ],
   );
 
@@ -581,7 +699,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         ai_can_spend_mp_in_battle: true,
       },
       melee: {
-        id: normalizeId(melee.id),
+        id: generatedSkillIds.melee,
         name: melee.name.trim(),
         type: "melee",
         range: seasonTemplate.melee.range,
@@ -604,7 +722,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         exclusive_upgrade_rule: "damage_boost_or_debuff_only",
       },
       ranged: {
-        id: normalizeId(ranged.id),
+        id: generatedSkillIds.ranged,
         name: ranged.name.trim(),
         type: "ranged",
         mp_cost: rangedCost,
@@ -615,7 +733,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         cost_curve: "season_template_ranged_curve",
       },
       block: {
-        id: normalizeId(block.id),
+        id: generatedSkillIds.block,
         name: block.name.trim(),
         type: "block",
         mp_cost: blockCost,
@@ -633,7 +751,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         ai_can_spend_mp_in_battle: true,
       },
       dodge: {
-        id: normalizeId(dodge.id),
+        id: generatedSkillIds.dodge,
         name: dodge.name.trim(),
         type: "dodge",
         mode: dodge.mode,
@@ -660,6 +778,10 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       dodge,
       dodgeCost,
       dodgeRetreat,
+      generatedSkillIds.block,
+      generatedSkillIds.dodge,
+      generatedSkillIds.melee,
+      generatedSkillIds.ranged,
       melee,
       passiveResource,
       ranged,
@@ -671,7 +793,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   const skillResources = useMemo(
     () => [
       {
-        id: normalizeId(melee.id),
+        id: generatedSkillIds.melee,
         name: melee.name.trim(),
         type: "melee",
         mp_cost: melee.mpCost,
@@ -682,7 +804,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         max_damage: seasonTemplate.melee.maxDamage,
       },
       {
-        id: normalizeId(ranged.id),
+        id: generatedSkillIds.ranged,
         name: ranged.name.trim(),
         type: "ranged",
         mp_cost: rangedCost,
@@ -702,7 +824,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         max_knockback: seasonTemplate.ranged.maxKnockback,
       },
       {
-        id: normalizeId(block.id),
+        id: generatedSkillIds.block,
         name: block.name.trim(),
         type: "block",
         mp_cost: blockCost,
@@ -710,14 +832,14 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         max_damage_reduction: seasonTemplate.block.maxReduction,
       },
       {
-        id: normalizeId(dodge.id),
+        id: generatedSkillIds.dodge,
         name: dodge.name.trim(),
         type: "dodge",
         mp_cost: dodgeCost,
         retreat_distance: dodgeRetreat,
       },
     ],
-    [block, blockCost, dodge.id, dodgeCost, dodgeRetreat, melee, ranged, rangedCost, seasonTemplate],
+    [block, blockCost, dodgeCost, dodgeRetreat, generatedSkillIds, melee, ranged, rangedCost, seasonTemplate],
   );
 
   const infoPackage = useMemo(
@@ -755,16 +877,9 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
 
   const validationIssues = useMemo(() => {
     const issues: string[] = [];
-    const passiveId = passive.mode === "none" ? "" : normalizeId(passive.id);
-    const skillIds = [normalizeId(melee.id), normalizeId(ranged.id), normalizeId(block.id), normalizeId(dodge.id)];
-    const ids = [resourceId, ...skillIds, ...(passiveId ? [passiveId] : [])];
-    const uniqueIds = new Set(ids);
 
     if (projectName.trim().length === 0) {
       issues.push(lang === "en" ? "Project name cannot be empty." : "项目名称不能为空。");
-    }
-    if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(resourceId)) {
-      issues.push(lang === "en" ? "Generated character ID must be 3-64 file-safe characters." : "自动生成的角色 ID 需要是 3-64 位文件安全字符。");
     }
     if (characterResource.name.length === 0) {
       issues.push(lang === "en" ? "Character name cannot be empty." : "角色名不能为空。");
@@ -786,19 +901,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
           : `${seasonTemplate.id} 能量固定为 ${seasonTemplate.characterDefaults.mp}。`,
       );
     }
-    if (uniqueIds.size !== ids.length) {
-      issues.push(lang === "en" ? "Character and skill IDs must be unique." : "角色和技能 ID 不能重复。");
-    }
-
-    for (const skillId of skillIds) {
-      if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(skillId)) {
-        issues.push(lang === "en" ? `Skill ID ${skillId || "(empty)"} is invalid.` : `技能 ID ${skillId || "空"} 不合法。`);
-      }
-    }
     if (passive.mode !== "none") {
-      if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(passiveId)) {
-        issues.push(lang === "en" ? `Passive ID ${passiveId || "(empty)"} is invalid.` : `被动 ID ${passiveId || "空"} 不合法。`);
-      }
       if (passive.name.trim().length === 0) {
         issues.push(lang === "en" ? "Passive name cannot be empty." : "被动名称不能为空。");
       }
@@ -932,7 +1035,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
     passive,
     projectName,
     ranged,
-    resourceId,
+    generatedSkillIds,
     seasonTemplate,
   ]);
 
@@ -950,6 +1053,56 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
   );
 
   const previewText = useMemo(() => JSON.stringify(previewPackage, null, 2), [previewPackage]);
+  const draftSnapshot = useMemo<CreatorDraftSnapshot>(
+    () => ({
+      schemaVersion: 1,
+      savedAt: new Date().toISOString(),
+      selectedSeasonId,
+      activeSkill,
+      projectName,
+      characterName,
+      creator,
+      description,
+      trainingNotes,
+      portrait,
+      basic,
+      melee,
+      ranged,
+      block,
+      dodge,
+      passive,
+    }),
+    [
+      activeSkill,
+      basic,
+      block,
+      characterName,
+      creator,
+      description,
+      dodge,
+      melee,
+      passive,
+      portrait,
+      projectName,
+      ranged,
+      selectedSeasonId,
+      trainingNotes,
+    ],
+  );
+  const latestDraftRef = useRef(draftSnapshot);
+
+  useEffect(() => {
+    latestDraftRef.current = draftSnapshot;
+    const saveTimer = window.setTimeout(() => writeCreatorDraft(draftSnapshot), 600);
+    return () => window.clearTimeout(saveTimer);
+  }, [draftSnapshot]);
+
+  useEffect(
+    () => () => {
+      writeCreatorDraft(latestDraftRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1005,7 +1158,7 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
       const path = await save({
-        defaultPath: `${resourceId || "uce_character"}.ucechar`,
+        defaultPath: `${submissionFileStem}.ucechar`,
         filters: [{ name: "UCE Character Submission", extensions: ["ucechar"] }],
       });
 
@@ -1096,10 +1249,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
           </div>
           <div className="creator-grid">
             <label>
-              <span>{t.id}</span>
-              <input value={melee.id} onChange={(e) => setMelee((current) => ({ ...current, id: e.target.value }))} />
-            </label>
-            <label>
               <span>{t.skillName}</span>
               <input value={melee.name} onChange={(e) => setMelee((current) => ({ ...current, name: e.target.value }))} />
             </label>
@@ -1159,10 +1308,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         <>
           <p className="creator-rule-note">{t.rangedNote}</p>
           <div className="creator-grid">
-            <label>
-              <span>{t.id}</span>
-              <input value={ranged.id} onChange={(e) => setRanged((current) => ({ ...current, id: e.target.value }))} />
-            </label>
             <label>
               <span>{t.skillName}</span>
               <input value={ranged.name} onChange={(e) => setRanged((current) => ({ ...current, name: e.target.value }))} />
@@ -1227,10 +1372,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
         <>
           <p className="creator-rule-note">{t.blockNote}</p>
           <div className="creator-grid">
-            <label>
-              <span>{t.id}</span>
-              <input value={block.id} onChange={(e) => setBlock((current) => ({ ...current, id: e.target.value }))} />
-            </label>
             <label>
               <span>{t.skillName}</span>
               <input value={block.name} onChange={(e) => setBlock((current) => ({ ...current, name: e.target.value }))} />
@@ -1308,10 +1449,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
           <div className="creator-grid">
             {passive.mode === "custom" && (
               <>
-                <label>
-                  <span>{t.id}</span>
-                  <input value={passive.id} onChange={(e) => setPassive((current) => ({ ...current, id: e.target.value }))} />
-                </label>
                 <label>
                   <span>{t.skillName}</span>
                   <input value={passive.name} onChange={(e) => setPassive((current) => ({ ...current, name: e.target.value }))} />
@@ -1413,10 +1550,6 @@ export default function CreatorPage({ goBack }: CreatorPageProps) {
           </button>
         </div>
         <div className="creator-grid">
-          <label>
-            <span>{t.id}</span>
-            <input value={dodge.id} onChange={(e) => setDodge((current) => ({ ...current, id: e.target.value }))} />
-          </label>
           <label>
             <span>{t.skillName}</span>
             <input value={dodge.name} onChange={(e) => setDodge((current) => ({ ...current, name: e.target.value }))} />

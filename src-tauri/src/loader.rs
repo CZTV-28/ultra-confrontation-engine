@@ -12,9 +12,7 @@ pub struct Loader {
 
 impl Loader {
     pub fn new() -> Self {
-        let assets_dir = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("assets");
+        let assets_dir = default_assets_dir();
         Self { assets_dir }
     }
 
@@ -102,4 +100,21 @@ impl Loader {
             .map_err(|e| format!("读取技能文件失败 {}: {}", path.display(), e))?;
         serde_json::from_str(&content).map_err(|e| format!("解析技能文件失败: {}", e))
     }
+}
+
+fn default_assets_dir() -> PathBuf {
+    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    if cfg!(debug_assertions)
+        && current
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy() == "src-tauri")
+    {
+        if let Some(source_dir) = current.parent().map(|parent| parent.join("assets")) {
+            if source_dir.is_dir() {
+                return source_dir;
+            }
+        }
+    }
+
+    current.join("assets")
 }

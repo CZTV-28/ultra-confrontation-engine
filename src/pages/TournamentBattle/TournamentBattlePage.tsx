@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import UCWindow from "../../components/common/UCWindow/UCWindow";
-import { loadS1PublicRoster, type S1RosterSlot } from "../../services/s1Roster";
+import { getS1RosterStats, loadS1PublicRoster, type S1RosterSlot } from "../../services/s1Roster";
 import {
+  isS1TournamentSeeded,
   loadS1Tournament,
   type S1Tournament,
   type TournamentMatch,
@@ -198,7 +199,15 @@ function matchSlots(matchById: Map<string, TournamentMatch>, match: TournamentMa
   return match.sources.map((source) => resolveSourceSlot(matchById, source)).filter((slot): slot is number => Boolean(slot));
 }
 
+function canUseTournamentBracket(tournament: S1Tournament, roster: S1RosterSlot[]) {
+  return isS1TournamentSeeded(tournament) && getS1RosterStats(roster).approved >= tournament.capacity;
+}
+
 function readyMatches(tournament: S1Tournament, roster: S1RosterSlot[]): ReadyTournamentMatch[] {
+  if (!canUseTournamentBracket(tournament, roster)) {
+    return [];
+  }
+
   const rosterBySlot = new Map(roster.map((slot) => [slot.slot, slot]));
   const matches = allMatches(tournament);
   const matchById = new Map(matches.map((match) => [match.id, match]));

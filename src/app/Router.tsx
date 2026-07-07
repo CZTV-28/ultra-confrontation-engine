@@ -5,6 +5,7 @@ import BattlePage from "../pages/Battle/BattlePage";
 import CreatorPage from "../pages/Creator/CreatorPage";
 import RulesPage from "../pages/Rules/RulesPage";
 import ReviewPage from "../pages/Review/ReviewPage";
+import SeasonRosterPage from "../pages/SeasonRoster/SeasonRosterPage";
 import TrainerPage from "../pages/Trainer/TrainerPage";
 import TournamentBattlePage from "../pages/TournamentBattle/TournamentBattlePage";
 import ReplayPage from "../pages/Replay/ReplayPage";
@@ -18,6 +19,7 @@ type Page =
   | "creator"
   | "rules"
   | "review"
+  | "seasonRoster"
   | "trainer"
   | "tournamentBattle"
   | "replay"
@@ -30,6 +32,7 @@ const pageMap: Record<string, Page> = {
   "/creator": "creator",
   "/rules": "rules",
   "/review": "review",
+  "/season-roster": "seasonRoster",
   "/trainer": "trainer",
   "/tournament-battle": "tournamentBattle",
   "/replay": "replay",
@@ -43,6 +46,7 @@ const pathMap: Record<Page, string> = {
   creator: "/creator",
   rules: "/rules",
   review: "/review",
+  seasonRoster: "/season-roster",
   trainer: "/trainer",
   tournamentBattle: "/tournament-battle",
   replay: "/replay",
@@ -55,7 +59,7 @@ function getPageFromLocation(): Page {
 }
 
 function isProtectedPage(page: Page) {
-  return page === "review" || page === "trainer" || page === "tournamentBattle" || page === "developers";
+  return page === "review" || page === "seasonRoster" || page === "trainer" || page === "tournamentBattle" || page === "developers";
 }
 
 export default function AppRouter() {
@@ -106,6 +110,8 @@ export default function AppRouter() {
         return <RulesPage {...pageProps} />;
       case "review":
         return <ReviewPage {...pageProps} />;
+      case "seasonRoster":
+        return <SeasonRosterPage {...pageProps} />;
       case "trainer":
         return <TrainerPage {...pageProps} />;
       case "tournamentBattle":

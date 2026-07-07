@@ -402,12 +402,13 @@
 }
 
 .review-audit-panel {
-  flex: 1;
-  overflow: hidden;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .review-issue-list {
-  height: calc(100% - 34px);
+  min-height: 220px;
+  max-height: min(440px, 48vh);
   overflow: auto;
   padding-right: 4px;
 }
@@ -458,9 +459,145 @@
   overflow-wrap: anywhere;
 }
 
+.review-character-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-character-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.review-character-field-wide {
+  grid-column: 1 / -1;
+}
+
+.review-character-field span {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.review-character-field input,
+.review-character-field textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.review-character-field input {
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.review-character-field textarea {
+  resize: vertical;
+  padding: 9px;
+  line-height: 1.5;
+}
+
+.review-character-field input:focus,
+.review-character-field textarea:focus {
+  border-color: rgba(142, 255, 122, 0.48);
+  box-shadow:
+    0 0 0 1px rgba(142, 255, 122, 0.1),
+    0 0 14px rgba(142, 255, 122, 0.08);
+}
+
+.review-passive-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.review-passive-editor > p {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 3px solid rgba(255, 200, 87, 0.82);
+  background: rgba(255, 200, 87, 0.07);
+  color: rgba(255, 232, 188, 0.88);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-passive-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-passive-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.review-passive-field-wide {
+  grid-column: 1 / -1;
+}
+
+.review-passive-field span {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.review-passive-field input,
+.review-passive-field textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.review-passive-field input {
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.review-passive-field textarea {
+  min-height: 92px;
+  resize: vertical;
+  padding: 9px;
+  line-height: 1.5;
+}
+
+.review-passive-field input:focus,
+.review-passive-field textarea:focus {
+  border-color: rgba(255, 200, 87, 0.52);
+  box-shadow:
+    0 0 0 1px rgba(255, 200, 87, 0.1),
+    0 0 14px rgba(255, 200, 87, 0.08);
+}
+
 .review-skill-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.review-skill-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -501,6 +638,88 @@
   color: rgba(255, 255, 255, 0.64);
   font-size: 12px;
   font-style: normal;
+}
+
+.review-skill-editor {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(135deg, rgba(142, 255, 122, 0.045), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.review-skill-editor-head {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-skill-editor-head strong {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.review-skill-editor-head span {
+  flex: 0 0 auto;
+  color: #8eff7a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.review-skill-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.review-skill-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.review-skill-field:first-child {
+  grid-column: 1 / -1;
+}
+
+.review-skill-field span {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.review-skill-field input {
+  min-width: 0;
+  width: 100%;
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  padding: 0 9px;
+}
+
+.review-skill-field input:focus {
+  border-color: rgba(142, 255, 122, 0.48);
+  box-shadow:
+    0 0 0 1px rgba(142, 255, 122, 0.1),
+    0 0 14px rgba(142, 255, 122, 0.08);
 }
 
 .review-panel pre {

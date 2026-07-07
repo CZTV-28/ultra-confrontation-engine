@@ -10,6 +10,7 @@ import {
 } from "../../services/s1Roster";
 import {
   createDefaultS1Tournament,
+  isS1TournamentSeeded,
   loadS1Tournament,
   type TournamentMatch,
   type TournamentRound,
@@ -137,7 +138,7 @@ const content = {
     rulesTitle: "S1 规则概览",
     preparingText: "正在筹备中",
     comingSoonText: "敬请期待",
-    rosterTitle: "S1 参赛名单",
+    rosterTitle: "S1 赛季名单席位",
     rosterPreparing: "S1：起源正在筹备中，名单将随着官方审核逐步填充。",
     rosterTotal: "总席位",
     rosterOccupied: "已登记",
@@ -145,10 +146,10 @@ const content = {
     rosterPending: "待复核",
     rosterRejected: "已驳回",
     rosterEmpty: "空位",
-    bracketTitle: "S1 晋级流程",
-    bracketPreparing: "对阵表将在名单满员并完成官方分组后生成。",
+    bracketTitle: "S1 随机对阵席位",
+    bracketPreparing: "对阵表将在 32 人名单满员后，由系统随机分组并经官方确认后生成。",
     bracketMatchLabel: "对局",
-    bracketParticipantTbd: "待定",
+    bracketParticipantTbd: "待抽签",
     bracketRunnerUp: "亚军",
     bracketThirdPlace: "季军",
     bracketRounds: [
@@ -223,7 +224,7 @@ const content = {
     rulesTitle: "S1 Rules Overview",
     preparingText: "Preparing",
     comingSoonText: "Coming soon",
-    rosterTitle: "S1 Participant Roster",
+    rosterTitle: "S1 Season Roster Slots",
     rosterPreparing: "S1: Origin is preparing. The roster will fill as official reviews are completed.",
     rosterTotal: "Total Slots",
     rosterOccupied: "Registered",
@@ -231,10 +232,10 @@ const content = {
     rosterPending: "Pending",
     rosterRejected: "Rejected",
     rosterEmpty: "Empty",
-    bracketTitle: "S1 Bracket Flow",
-    bracketPreparing: "The bracket will be generated after the roster is full and official seeding is complete.",
+    bracketTitle: "S1 Randomized Bracket Slots",
+    bracketPreparing: "The bracket is generated after all 32 roster slots are filled, randomized by the system, and confirmed by officials.",
     bracketMatchLabel: "Match",
-    bracketParticipantTbd: "TBD",
+    bracketParticipantTbd: "Pending Draw",
     bracketRunnerUp: "Runner-up",
     bracketThirdPlace: "Third Place",
     bracketRounds: [
@@ -319,6 +320,12 @@ export default function RulesPage({ goBack }: RulesPageProps) {
     () => (selectedSeason.id === "S1" ? t.rules : []),
     [selectedSeason.id, t.rules],
   );
+  const s1BracketCanRevealParticipants = useMemo(
+    () =>
+      s1RosterStats.approved >= s1Tournament.capacity
+      && isS1TournamentSeeded(s1Tournament),
+    [s1RosterStats.approved, s1Tournament.capacity, s1Tournament.status],
+  );
   const s1Bracket = useMemo(() => {
     const rosterBySlot = new Map(s1Roster.map((slot) => [slot.slot, slot]));
     const matchById = new Map<string, TournamentMatch>();
@@ -359,6 +366,10 @@ export default function RulesPage({ goBack }: RulesPageProps) {
       return sourceType === "loser" ? sourceMatch?.loserSlot : sourceMatch?.winnerSlot;
     };
     const createMatchParticipants = (match: TournamentMatch): BracketParticipant[] => {
+      if (!s1BracketCanRevealParticipants) {
+        return [createPendingParticipant(), createPendingParticipant()];
+      }
+
       if (match.slots.length > 0) {
         return match.slots.map(createRosterParticipant);
       }
@@ -393,11 +404,17 @@ export default function RulesPage({ goBack }: RulesPageProps) {
       left: s1Tournament.bracket.left.map(createRound),
       right: s1Tournament.bracket.right.map(createRound),
       champion: t.bracketRounds[5],
-      championParticipant: createPlacementParticipant(s1Tournament.placements.championSlot),
-      runnerUpParticipant: createPlacementParticipant(s1Tournament.placements.runnerUpSlot),
-      thirdPlaceParticipant: createPlacementParticipant(s1Tournament.placements.thirdPlaceSlot),
+      championParticipant: s1BracketCanRevealParticipants
+        ? createPlacementParticipant(s1Tournament.placements.championSlot)
+        : createPendingParticipant(),
+      runnerUpParticipant: s1BracketCanRevealParticipants
+        ? createPlacementParticipant(s1Tournament.placements.runnerUpSlot)
+        : createPendingParticipant(),
+      thirdPlaceParticipant: s1BracketCanRevealParticipants
+        ? createPlacementParticipant(s1Tournament.placements.thirdPlaceSlot)
+        : createPendingParticipant(),
     };
-  }, [lang, s1Roster, s1Tournament, t]);
+  }, [lang, s1BracketCanRevealParticipants, s1Roster, s1Tournament, t]);
 
   useEffect(() => {
     const handleResize = () => setViewportSize(getRulesViewportSize());

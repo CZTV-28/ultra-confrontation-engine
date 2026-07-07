@@ -10,9 +10,10 @@ use crate::validator::{
 };
 use chrono::Utc;
 use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
@@ -139,6 +140,22 @@ pub struct S1RosterSlot {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S1RosterEntryInput {
+    pub slot: usize,
+    pub character_id: String,
+    pub character_name: String,
+    #[serde(default)]
+    pub project_name: String,
+    pub creator: String,
+    pub source_path: String,
+    pub review_decision: String,
+    pub official_notes: String,
+    pub checksum: String,
+    pub review_package_status: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct S1RosterFile {
@@ -225,6 +242,15 @@ pub struct S1MatchRecordResult {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S1TournamentSeedResult {
+    pub status: String,
+    pub capacity: usize,
+    pub slot_order: Vec<usize>,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BattleConfig {
@@ -264,9 +290,20 @@ fn build_asset_validation_report(loader: &Loader) -> Result<AssetValidationRepor
 }
 
 fn runtime_assets_dir() -> PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("assets")
+    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    if cfg!(debug_assertions)
+        && current
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy() == "src-tauri")
+    {
+        if let Some(source_dir) = current.parent().map(|parent| parent.join("assets")) {
+            if source_dir.is_dir() {
+                return source_dir;
+            }
+        }
+    }
+
+    current.join("assets")
 }
 
 fn source_assets_dir() -> Option<PathBuf> {
@@ -352,7 +389,9 @@ fn normalize_s1_roster_file(mut roster: S1RosterFile) -> S1RosterFile {
 
         let slot_number = slot.slot;
         if slot.character_id.trim().is_empty() {
+            let updated_at = slot.updated_at.clone();
             slot = empty_s1_roster_slot(slot_number);
+            slot.updated_at = updated_at;
         } else if slot.status.trim().is_empty() {
             slot.status = "pending_review".to_string();
         }
@@ -535,11 +574,127 @@ fn s1_all_required_matches_completed(tournament: &S1TournamentFile) -> bool {
         && tournament.bracket.third_place.status == "completed"
 }
 
+fn is_s1_public_competitor_status(status: &str) -> bool {
+    matches!(status, "approved" | "imported" | "trained")
+}
+
+fn ready_s1_roster_slots(roster: &S1RosterFile) -> Vec<usize> {
+    roster
+        .slots
+        .iter()
+        .filter(|slot| {
+            is_s1_public_competitor_status(&slot.status) && !slot.character_id.trim().is_empty()
+        })
+        .map(|slot| slot.slot)
+        .collect()
+}
+
+fn clear_s1_match_progress(match_data: &mut S1TournamentMatch) {
+    match_data.status = "pending".to_string();
+    match_data.winner_slot = None;
+    match_data.loser_slot = None;
+    match_data.replay_id = None;
+    match_data.updated_at.clear();
+}
+
+fn reset_s1_bracket_progress(tournament: &mut S1TournamentFile) {
+    let right_first_round_index = tournament.bracket.left.len();
+    for (round_index, round) in tournament
+        .bracket
+        .left
+        .iter_mut()
+        .chain(tournament.bracket.right.iter_mut())
+        .enumerate()
+    {
+        for match_data in &mut round.matches {
+            clear_s1_match_progress(match_data);
+            if round_index != 0 && round_index != right_first_round_index {
+                match_data.slots.clear();
+            }
+        }
+    }
+
+    clear_s1_match_progress(&mut tournament.bracket.final_match);
+    tournament.bracket.final_match.slots.clear();
+    clear_s1_match_progress(&mut tournament.bracket.third_place);
+    tournament.bracket.third_place.slots.clear();
+
+    tournament.placements.champion_slot = None;
+    tournament.placements.runner_up_slot = None;
+    tournament.placements.third_place_slot = None;
+    tournament.placements.fourth_place_slot = None;
+}
+
+fn apply_s1_seed_order(
+    tournament: &mut S1TournamentFile,
+    slot_order: &[usize],
+    updated_at: &str,
+) -> Result<(), String> {
+    if matches!(tournament.status.as_str(), "running" | "completed") {
+        return Err("S1 bracket has already started and cannot be re-seeded.".to_string());
+    }
+
+    if slot_order.len() != S1_ROSTER_SIZE {
+        return Err(format!(
+            "S1 bracket seed requires {} roster slots, got {}.",
+            S1_ROSTER_SIZE,
+            slot_order.len()
+        ));
+    }
+
+    let left_first_round_count = tournament
+        .bracket
+        .left
+        .first()
+        .map(|round| round.matches.len())
+        .unwrap_or(0);
+    let right_first_round_count = tournament
+        .bracket
+        .right
+        .first()
+        .map(|round| round.matches.len())
+        .unwrap_or(0);
+
+    if (left_first_round_count + right_first_round_count) * 2 != S1_ROSTER_SIZE {
+        return Err("S1 bracket structure does not contain 16 first-round matches.".to_string());
+    }
+
+    reset_s1_bracket_progress(tournament);
+
+    let mut pairs = slot_order.chunks_exact(2);
+    if let Some(round) = tournament.bracket.left.first_mut() {
+        for match_data in &mut round.matches {
+            let pair = pairs
+                .next()
+                .ok_or_else(|| "S1 bracket seed ran out of left-side pairs.".to_string())?;
+            match_data.slots = pair.to_vec();
+            match_data.sources.clear();
+        }
+    }
+    if let Some(round) = tournament.bracket.right.first_mut() {
+        for match_data in &mut round.matches {
+            let pair = pairs
+                .next()
+                .ok_or_else(|| "S1 bracket seed ran out of right-side pairs.".to_string())?;
+            match_data.slots = pair.to_vec();
+            match_data.sources.clear();
+        }
+    }
+
+    tournament.status = "seeded".to_string();
+    tournament.updated_at = updated_at.to_string();
+    Ok(())
+}
+
 fn apply_s1_match_result(
     tournament: &mut S1TournamentFile,
     roster: &S1RosterFile,
     input: &S1MatchResultInput,
 ) -> Result<S1MatchRecordResult, String> {
+    if !matches!(tournament.status.as_str(), "seeded" | "running") {
+        return Err("S1 bracket has not been randomly seeded yet.".to_string());
+    }
+
     if input.winner_character_id != input.left_character_id
         && input.winner_character_id != input.right_character_id
     {
@@ -658,6 +813,85 @@ fn select_s1_roster_slot(
         .find(|slot| slot.status == "empty" || slot.character_id.trim().is_empty())
         .map(|slot| slot.slot)
         .ok_or_else(|| "S1 名单已满，无法自动登记。".to_string())
+}
+
+fn s1_roster_status_from_review_decision(
+    decision: &str,
+    current: &S1RosterSlot,
+    character_id: &str,
+) -> String {
+    match decision {
+        "approved" => {
+            if current.character_id == character_id
+                && matches!(current.status.as_str(), "imported" | "trained")
+            {
+                current.status.clone()
+            } else {
+                "approved".to_string()
+            }
+        }
+        "rejected" => "rejected".to_string(),
+        _ => "pending_review".to_string(),
+    }
+}
+
+fn upsert_s1_roster_entry_asset(
+    base_dir: &Path,
+    input: &S1RosterEntryInput,
+) -> Result<S1RosterFile, String> {
+    let mut roster = read_s1_roster_file(base_dir)?;
+    if !(1..=S1_ROSTER_SIZE).contains(&input.slot) {
+        return Err(format!("S1 roster slot out of range: {}", input.slot));
+    }
+
+    let character_id = input.character_id.trim();
+    if character_id.is_empty() {
+        return Err("S1 roster entry requires a season contestant ID.".to_string());
+    }
+
+    let target_index = input.slot - 1;
+    let current = &roster.slots[target_index];
+    let review_decision = match input.review_decision.trim() {
+        "approved" => "approved",
+        "rejected" => "rejected",
+        _ => "pending",
+    };
+    let updated_at = now_iso();
+    roster.updated_at = updated_at.clone();
+    roster.slots[target_index] = S1RosterSlot {
+        slot: input.slot,
+        status: s1_roster_status_from_review_decision(review_decision, current, character_id),
+        character_id: character_id.to_string(),
+        character_name: input.character_name.trim().to_string(),
+        project_name: input.project_name.trim().to_string(),
+        creator: input.creator.trim().to_string(),
+        source_path: input.source_path.trim().to_string(),
+        review_decision: review_decision.to_string(),
+        official_notes: input.official_notes.trim().to_string(),
+        checksum: input.checksum.trim().to_string(),
+        review_package_status: input.review_package_status.trim().to_string(),
+        updated_at,
+    };
+
+    write_s1_roster_file(base_dir, &roster)?;
+    Ok(roster)
+}
+
+fn clear_s1_roster_entry_asset(base_dir: &Path, slot: usize) -> Result<S1RosterFile, String> {
+    let mut roster = read_s1_roster_file(base_dir)?;
+    if !(1..=S1_ROSTER_SIZE).contains(&slot) {
+        return Err(format!("S1 roster slot out of range: {}", slot));
+    }
+
+    let updated_at = now_iso();
+    roster.updated_at = updated_at.clone();
+    roster.slots[slot - 1] = S1RosterSlot {
+        updated_at,
+        ..empty_s1_roster_slot(slot)
+    };
+
+    write_s1_roster_file(base_dir, &roster)?;
+    Ok(roster)
 }
 
 fn upsert_s1_roster_asset(
@@ -824,6 +1058,14 @@ fn write_json_asset(
     fs::write(&path, format!("{}\n", content))
         .map_err(|e| format!("写入资源文件失败 {}: {}", path.display(), e))?;
     Ok(path)
+}
+
+fn read_json_asset(base_dir: &Path, folder: &str, id: &str) -> Result<Value, String> {
+    let path = asset_file_path(base_dir, folder, id)?;
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read asset file {}: {}", path.display(), e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse asset file {}: {}", path.display(), e))
 }
 
 fn ensure_assets_valid(loader: &Loader) -> Result<(), String> {
@@ -1064,8 +1306,174 @@ pub fn list_s1_public_roster() -> Result<Vec<S1RosterSlot>, String> {
 }
 
 #[tauri::command]
+pub fn upsert_s1_roster_slot(input: S1RosterEntryInput) -> Result<Vec<S1RosterSlot>, String> {
+    let asset_dirs = official_asset_dirs();
+    let mut latest_roster = None;
+
+    for dir in &asset_dirs {
+        latest_roster = Some(upsert_s1_roster_entry_asset(dir, &input)?);
+    }
+
+    latest_roster
+        .map(|roster| roster.slots)
+        .ok_or_else(|| "No writable S1 roster asset directory found.".to_string())
+}
+
+#[tauri::command]
+pub fn clear_s1_roster_slot(slot: usize) -> Result<Vec<S1RosterSlot>, String> {
+    let asset_dirs = official_asset_dirs();
+    let mut latest_roster = None;
+
+    for dir in &asset_dirs {
+        latest_roster = Some(clear_s1_roster_entry_asset(dir, slot)?);
+    }
+
+    latest_roster
+        .map(|roster| roster.slots)
+        .ok_or_else(|| "No writable S1 roster asset directory found.".to_string())
+}
+
+#[tauri::command]
 pub fn get_s1_tournament() -> Result<Value, String> {
     read_s1_tournament_file(&runtime_assets_dir())
+}
+
+#[tauri::command]
+pub fn get_s1_official_revision_package(character_id: String) -> Result<Value, String> {
+    let normalized_id = character_id.trim();
+    if !is_file_safe_asset_id(normalized_id) {
+        return Err(format!(
+            "Invalid character ID for official revision: {}",
+            character_id
+        ));
+    }
+
+    let base_dir = runtime_assets_dir();
+    let character_value = read_json_asset(&base_dir, "characters", normalized_id)?;
+    let character: Character = serde_json::from_value(character_value.clone()).map_err(|e| {
+        format!(
+            "Failed to parse official character {}: {}",
+            normalized_id, e
+        )
+    })?;
+
+    let skill_ids = [
+        character.skills.melee.as_str(),
+        character.skills.ranged.as_str(),
+        character.skills.block.as_str(),
+        character.skills.dodge.as_str(),
+    ];
+    let mut skills = Vec::new();
+    for skill_id in skill_ids {
+        skills.push(read_json_asset(&base_dir, "skills", skill_id)?);
+    }
+
+    let passive_id = character.skills.passive.as_deref().or_else(|| {
+        character
+            .passive
+            .as_ref()
+            .map(|passive| passive.id.as_str())
+    });
+    let passive = if let Some(passive_id) = passive_id {
+        read_json_asset(&base_dir, "passives", passive_id).or_else(|_| {
+            character_value
+                .get("passive")
+                .cloned()
+                .ok_or_else(|| format!("Failed to find passive asset: {}", passive_id))
+        })?
+    } else {
+        Value::Null
+    };
+
+    let roster = read_s1_roster_file(&base_dir)?;
+    let roster_slot = roster
+        .slots
+        .iter()
+        .find(|slot| slot.character_id == normalized_id);
+    let roster_value = roster_slot
+        .map(|slot| {
+            json!({
+                "season": S1_ROSTER_SEASON,
+                "slot": slot.slot,
+                "status": slot.status,
+                "updated_at": slot.updated_at,
+            })
+        })
+        .unwrap_or(Value::Null);
+
+    let passive_target = passive_id.map(|id| format!("assets/passives/{}.json", id));
+    Ok(json!({
+        "package_type": "uce_official_import_package",
+        "schema_version": "0.1.3",
+        "generated_at": now_iso(),
+        "source": {
+            "path": format!("assets/characters/{}.json", normalized_id),
+            "mode": "official_revision",
+            "character_id": normalized_id,
+        },
+        "review": {
+            "base_status": "official_revision",
+            "official_decision": "approved",
+            "official_notes": "",
+            "errors": 0,
+            "warnings": [],
+        },
+        "roster": roster_value,
+        "asset_targets": {
+            "character": format!("assets/characters/{}.json", normalized_id),
+            "skills": skill_ids
+                .iter()
+                .map(|skill_id| format!("assets/skills/{}.json", skill_id))
+                .collect::<Vec<String>>(),
+            "passive": passive_target,
+        },
+        "official_assets": {
+            "character": character_value,
+            "skills": skills,
+            "passive": passive,
+            "combat_design": Value::Null,
+            "training": Value::Null,
+        },
+    }))
+}
+
+#[tauri::command]
+pub fn seed_s1_tournament_bracket() -> Result<S1TournamentSeedResult, String> {
+    let asset_dirs = official_asset_dirs();
+    let primary_dir = asset_dirs
+        .first()
+        .ok_or_else(|| "No writable S1 tournament asset directory found.".to_string())?;
+    let roster = read_s1_roster_file(primary_dir)?;
+    let mut slot_order = ready_s1_roster_slots(&roster);
+
+    if slot_order.len() != S1_ROSTER_SIZE {
+        return Err(format!(
+            "S1 bracket requires all {} roster slots to be approved/imported/trained before random seeding. Current ready slots: {}.",
+            S1_ROSTER_SIZE,
+            slot_order.len()
+        ));
+    }
+
+    slot_order.shuffle(&mut rand::thread_rng());
+    let updated_at = now_iso();
+    let mut prepared_updates = Vec::new();
+
+    for dir in &asset_dirs {
+        let mut tournament = read_s1_tournament_struct(dir)?;
+        apply_s1_seed_order(&mut tournament, &slot_order, &updated_at)?;
+        prepared_updates.push((dir.clone(), tournament));
+    }
+
+    for (dir, tournament) in prepared_updates {
+        write_s1_tournament_file(&dir, &tournament)?;
+    }
+
+    Ok(S1TournamentSeedResult {
+        status: "seeded".to_string(),
+        capacity: S1_ROSTER_SIZE,
+        slot_order,
+        updated_at,
+    })
 }
 
 #[tauri::command]

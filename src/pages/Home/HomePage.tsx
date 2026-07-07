@@ -33,6 +33,7 @@ type Page =
   | "creator"
   | "rules"
   | "review"
+  | "seasonRoster"
   | "trainer"
   | "tournamentBattle"
   | "replay"
@@ -73,6 +74,11 @@ const sceneTones: Record<SceneId, SceneTone> = {
   review: {
     accent: [142, 255, 122],
     secondary: [255, 200, 87],
+    tertiary: [91, 231, 255],
+  },
+  seasonRoster: {
+    accent: [255, 200, 87],
+    secondary: [142, 255, 122],
     tertiary: [91, 231, 255],
   },
   trainer: {
@@ -250,6 +256,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
             { id: "battle", label: isEnglish ? "Battle Sim" : "模拟对战", icon: "B", page: "battle" },
             { id: "creator", label: isEnglish ? "Character Forge" : "角色设计", icon: "C", page: "creator" },
             { id: "review", label: isEnglish ? "Official Review" : "官方审核", icon: "V", page: "review" },
+            { id: "seasonRoster", label: isEnglish ? "Season Roster" : "赛季名单", icon: "R", page: "seasonRoster" },
             { id: "tournamentBattle", label: isEnglish ? "Tournament Battle" : "赛事对战", icon: "M", page: "tournamentBattle" },
             { id: "developers", label: isEnglish ? "Developers" : "开发者列表", icon: "D", page: "developers" },
             { id: "trainer", label: isEnglish ? "AI Trainer" : "AI训练", icon: "T", page: "trainer" },
@@ -491,7 +498,7 @@ export default function HomePage({ navigateTo }: HomePageProps) {
           </nav>
 
           <div className="home-version">
-            <span>UCE v0.1.2</span>
+            <span>UCE v0.1.3</span>
             {homeMode === "developer" && developerSession ? (
               <button type="button" onClick={logoutDeveloper}>
                 {isEnglish ? "Logout" : "退出登录"}

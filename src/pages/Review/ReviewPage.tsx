@@ -10,7 +10,7 @@ import {
   loadS1Roster,
   normalizeS1Roster,
   readS1Roster,
-  upsertS1RosterEntry,
+  saveS1RosterEntry,
   writeS1Roster,
   type S1ReviewDecision,
   type S1RosterSlot,
@@ -23,6 +23,9 @@ interface ReviewPageProps {
 
 type Language = "zh" | "en";
 type ReviewSeverity = "pass" | "warning" | "error";
+
+const OFFICIAL_REVISION_REQUEST_KEY = "uce:review:official-revision-character-id";
+const CURRENT_UCE_VERSION = "0.1.3";
 
 interface ReviewItem {
   severity: ReviewSeverity;
@@ -39,6 +42,10 @@ interface ChecksumStatus {
 
 interface CharacterResource {
   id?: unknown;
+  id_scope?: unknown;
+  season_contestant_id?: unknown;
+  season_contestant_id_status?: unknown;
+  permanent_character_id?: unknown;
   project_name?: unknown;
   name?: unknown;
   creator?: unknown;
@@ -146,13 +153,36 @@ const copy = {
     source: "来源文件",
     packageInfo: "提交信息",
     character: "角色资料",
+    officialId: "赛季参赛选手 ID",
+    projectName: "项目名称",
+    characterName: "角色名",
+    creator: "作者",
+    description: "简介",
+    hp: "生命",
+    mp: "能量",
     skills: "技能资源",
+    skillName: "技能名",
+    mpCost: "耗蓝",
+    damage: "伤害",
+    hitRate: "命中率",
+    range: "射程",
+    reduction: "减伤",
+    retreat: "后撤距离",
     passive: "被动技能",
+    passiveRuntimeNote: "当前自定义被动为审核描述，需后续映射到代码后才会参与战斗结算。",
+    effectCategory: "效果类别",
+    effectName: "效果名称",
+    triggerCondition: "触发条件",
+    passiveValue: "数值",
+    valueUnit: "数值单位",
+    effectDescription: "效果说明",
+    passiveDescription: "被动介绍",
     training: "训练备注",
     officialPreview: "官方资源预览",
     officialAssetsEditor: "官方资源编辑",
     officialAssetsEditorHint: "这里是最终写入资源库的官方稿，可修改所有文字和数值。",
     officialAssetsInvalid: "官方资源编辑稿不是合法 JSON。",
+    officialIdRequired: "请先填写赛季参赛选手 ID，再登记到 S1 名单。",
     resetOfficialAssets: "重置官方稿",
     audit: "审核结果",
     canApprove: "基础规则通过",
@@ -214,13 +244,36 @@ const copy = {
     source: "Source File",
     packageInfo: "Submission Info",
     character: "Character",
+    officialId: "Season Contestant ID",
+    projectName: "Project Name",
+    characterName: "Character Name",
+    creator: "Creator",
+    description: "Description",
+    hp: "HP",
+    mp: "MP",
     skills: "Skill Resources",
+    skillName: "Skill Name",
+    mpCost: "MP Cost",
+    damage: "Damage",
+    hitRate: "Hit Rate",
+    range: "Range",
+    reduction: "Reduction",
+    retreat: "Retreat",
     passive: "Passive",
+    passiveRuntimeNote: "Custom passives are review descriptions until they are mapped to executable battle logic.",
+    effectCategory: "Effect Category",
+    effectName: "Effect Name",
+    triggerCondition: "Trigger Condition",
+    passiveValue: "Value",
+    valueUnit: "Value Unit",
+    effectDescription: "Effect Description",
+    passiveDescription: "Passive Intro",
     training: "Training Notes",
     officialPreview: "Official Asset Preview",
     officialAssetsEditor: "Official Resource Editor",
     officialAssetsEditorHint: "This is the official draft that will be written to the asset library. Text and numeric values can be edited here.",
     officialAssetsInvalid: "The official resource draft is not valid JSON.",
+    officialIdRequired: "Enter the season contestant ID before registering to the S1 roster.",
     resetOfficialAssets: "Reset Official Draft",
     audit: "Review Result",
     canApprove: "Base Rules Passed",
@@ -291,6 +344,16 @@ function normalizeId(value: string) {
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function resourceIdWithSuffix(prefix: string, suffix: string) {
+  const safeSuffix = normalizeId(suffix) || "resource";
+  const fallbackPrefix = "official_character";
+  const maxPrefixLength = Math.max(1, 64 - safeSuffix.length - 1);
+  const safePrefix = (normalizeId(prefix) || fallbackPrefix)
+    .slice(0, maxPrefixLength)
+    .replace(/[-_]+$/g, "") || fallbackPrefix.slice(0, maxPrefixLength);
+  return `${safePrefix}_${safeSuffix}`;
 }
 
 function isFiveStep(value: number) {
@@ -382,6 +445,73 @@ function createOfficialAssetsDraft(submission: SubmissionPackage): OfficialAsset
   };
 }
 
+function normalizeOfficialAssetIds(assets: OfficialAssetsDraft): OfficialAssetsDraft {
+  const characterId = normalizeId(asString(assets.character?.id));
+  if (!characterId || !assets.character) {
+    return assets;
+  }
+
+  const skillTypes = ["melee", "ranged", "block", "dodge"] as const;
+  const skillIds = Object.fromEntries(
+    skillTypes.map((type) => [type, resourceIdWithSuffix(characterId, type)]),
+  ) as Record<(typeof skillTypes)[number], string>;
+  const passive = isRecord(assets.passive)
+    ? {
+        ...assets.passive,
+        id: resourceIdWithSuffix(characterId, "passive"),
+        execution_status: assets.passive.execution_status ?? "pending_code_mapping",
+      }
+    : assets.passive;
+
+  const character = {
+    ...assets.character,
+    id: characterId,
+    id_scope: "season_contestant",
+    season_contestant_id: characterId,
+    season_contestant_id_status: "assigned",
+    permanent_character_id: assets.character.permanent_character_id ?? null,
+    skills: {
+      ...(isRecord(assets.character.skills) ? assets.character.skills : {}),
+      ...skillIds,
+      passive: isRecord(passive) ? asString(passive.id) : null,
+    },
+    passive,
+  };
+
+  const skills = assets.skills.map((skill) => {
+    const type = asString(skill.type);
+    if (!skillTypes.includes(type as (typeof skillTypes)[number])) {
+      return { ...skill };
+    }
+    return {
+      ...skill,
+      id: skillIds[type as (typeof skillTypes)[number]],
+    };
+  });
+
+  const combatDesign = isRecord(assets.combat_design) ? { ...assets.combat_design } : assets.combat_design;
+  if (isRecord(combatDesign)) {
+    for (const type of skillTypes) {
+      const design = combatDesign[type];
+      if (isRecord(design)) {
+        combatDesign[type] = {
+          ...design,
+          id: skillIds[type],
+        };
+      }
+    }
+    combatDesign.passive = passive;
+  }
+
+  return {
+    ...assets,
+    character,
+    skills,
+    passive,
+    combat_design: combatDesign,
+  };
+}
+
 function parseOfficialAssetsDraft(text: string): { draft: OfficialAssetsDraft | null; error: string } {
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -422,6 +552,59 @@ function isApprovedOfficialPackage(value: unknown): value is OfficialImportPacka
   );
 }
 
+function allowsLegacyChecksumMismatch(submission: SubmissionPackage) {
+  return asString(submission.schema_version) === "0.1.0" || asString(submission.engine_version) === "0.1.0";
+}
+
+function isOfficialRevisionSubmission(submission: SubmissionPackage | null) {
+  return Boolean(
+    submission
+      && (asString(submission.generated_by) === "official_revision"
+        || asString(submission.export?.format) === "official_revision"),
+  );
+}
+
+function officialAssetsDraftFromPackage(officialPackage: OfficialImportPackage): OfficialAssetsDraft {
+  const officialAssets = officialPackage.official_assets ?? {};
+  return {
+    character: isRecord(officialAssets.character) ? officialAssets.character : null,
+    skills: Array.isArray(officialAssets.skills) ? (officialAssets.skills.filter(isRecord) as SkillResource[]) : [],
+    passive: Object.prototype.hasOwnProperty.call(officialAssets, "passive") ? officialAssets.passive : null,
+    combat_design: Object.prototype.hasOwnProperty.call(officialAssets, "combat_design")
+      ? officialAssets.combat_design
+      : null,
+    training: Object.prototype.hasOwnProperty.call(officialAssets, "training") ? officialAssets.training : null,
+  };
+}
+
+function submissionFromOfficialPackage(officialPackage: OfficialImportPackage): SubmissionPackage {
+  const draft = officialAssetsDraftFromPackage(officialPackage);
+  return {
+    package_type: "uce_character_submission",
+    file_extension: ".ucechar",
+    schema_version: asString(officialPackage.schema_version, CURRENT_UCE_VERSION),
+    engine_version: CURRENT_UCE_VERSION,
+    target_season: asString(officialPackage.roster?.season, "S1"),
+    ruleset_version: "0.1.0",
+    generated_by: "official_revision",
+    submission: {
+      source: "official_assets",
+      mode: "revision",
+    },
+    character: draft.character ?? undefined,
+    combat_design: draft.combat_design,
+    passive: draft.passive,
+    skills: draft.skills,
+    training: draft.training,
+    export: {
+      format: "official_revision",
+      exported_at: asString(officialPackage.generated_at, new Date().toISOString()),
+      checksum_algorithm: "sha256",
+      checksum: null,
+    },
+  };
+}
+
 function getRecordField(source: unknown, key: string) {
   return isRecord(source) ? source[key] : undefined;
 }
@@ -451,6 +634,14 @@ function reviewSubmission(
   const pass = (title: string, detail: string) => items.push({ severity: "pass", title, detail });
   const warning = (title: string, detail: string) => items.push({ severity: "warning", title, detail });
   const error = (title: string, detail: string) => items.push({ severity: "error", title, detail });
+  const officialRevision = isOfficialRevisionSubmission(submission);
+  const balanceError = (title: string, detail: string) => {
+    if (officialRevision) {
+      warning(title, `${detail} 官方修正版可由赛事官方人工覆盖。`);
+    } else {
+      error(title, detail);
+    }
+  };
 
   if (asString(submission.package_type) === "uce_character_submission") {
     pass("提交包类型", "package_type 正确。");
@@ -476,6 +667,8 @@ function reviewSubmission(
     warning("SHA-256 校验", "文件没有携带 checksum，无法判断是否被手动改动。");
   } else if (checksum.matched) {
     pass("SHA-256 校验", "导出校验码与当前文件内容一致。");
+  } else if (allowsLegacyChecksumMismatch(submission)) {
+    warning("SHA-256 历史包校验", "该角色来自 0.1.0 旧版通过流程，checksum 不一致不会阻断官方修正或导入。");
   } else {
     error("SHA-256 校验", "导出校验码与当前文件内容不一致，文件可能被手动改动。");
   }
@@ -488,9 +681,9 @@ function reviewSubmission(
 
   const characterId = asString(character.id);
   if (characterId && characterId === normalizeId(characterId)) {
-    pass("角色 ID", "角色 ID 适合作为资源文件名。");
+    pass("赛季参赛选手 ID", "赛季参赛选手 ID 适合作为当季赛事资源文件名。");
   } else {
-    error("角色 ID", "角色 ID 不能为空，且只能包含小写字母、数字、下划线或连字符。");
+    error("赛季参赛选手 ID", "赛季参赛选手 ID 不能为空，且只能包含小写字母、数字、下划线或连字符。");
   }
 
   if (hasText(character.project_name) && hasText(character.name) && hasText(character.creator)) {
@@ -502,7 +695,7 @@ function reviewSubmission(
   if (asNumber(character.hp) === 500 && asNumber(character.mp) === 250) {
     pass("S1 固定数值", "HP 500 / MP 250，符合 S1 限制。");
   } else {
-    error("S1 固定数值", "S1 角色必须固定为 500 HP / 250 MP。");
+    balanceError("S1 固定数值", "S1 角色必须固定为 500 HP / 250 MP。");
   }
 
   const skills = getSkills(submission);
@@ -536,12 +729,12 @@ function reviewSubmission(
     if (mpCost !== null && mpCost >= 0 && mpCost <= 50 && isFiveStep(mpCost)) {
       pass("近战蓝耗", "近战蓝耗在 0-50 且为 5 的整数倍。");
     } else {
-      error("近战蓝耗", "近战蓝耗必须在 0-50，并以 5 为单位。");
+      balanceError("近战蓝耗", "近战蓝耗必须在 0-50，并以 5 为单位。");
     }
     if (damage !== null && damage >= 10 && damage <= 75) {
       pass("近战伤害", "近战伤害在 10-75 范围内。");
     } else {
-      error("近战伤害", "近战伤害必须在 10-75。");
+      balanceError("近战伤害", "近战伤害必须在 10-75。");
     }
   }
 
@@ -564,24 +757,24 @@ function reviewSubmission(
     if (damage !== null && damage >= 25 && damage <= 150) {
       pass("远程伤害", "远程伤害在 25-150 范围内。");
     } else {
-      error("远程伤害", "远程伤害必须在 25-150。");
+      balanceError("远程伤害", "远程伤害必须在 25-150。");
     }
     if (hitRate !== null && hitRate >= 0.6 && hitRate <= 1) {
       pass("远程命中率", "远程命中率在 60%-100% 范围内。");
     } else {
-      error("远程命中率", "远程命中率必须在 60%-100%。");
+      balanceError("远程命中率", "远程命中率必须在 60%-100%。");
     }
     if (range !== null && range >= 100 && range <= 200) {
       pass("远程射程", "远程射程在 100-200 范围内。");
     } else {
-      error("远程射程", "远程射程必须在 100-200。");
+      balanceError("远程射程", "远程射程必须在 100-200。");
     }
     if (damage !== null && hitRate !== null && range !== null && mpCost !== null) {
       const expected = rangedMpCost(damage, hitRate, range);
       if (mpCost === expected) {
         pass("远程自动蓝耗", `远程蓝耗 ${mpCost} 与平衡曲线一致。`);
       } else {
-        error("远程自动蓝耗", `远程蓝耗应为 ${expected}，当前为 ${mpCost}。`);
+        balanceError("远程自动蓝耗", `远程蓝耗应为 ${expected}，当前为 ${mpCost}。`);
       }
     }
   }
@@ -601,14 +794,14 @@ function reviewSubmission(
     if (reduction !== null && reduction >= 0.5 && reduction <= 0.75) {
       pass("格挡减伤", "格挡减伤在 50%-75% 范围内。");
     } else {
-      error("格挡减伤", "格挡减伤必须在 50%-75%。");
+      balanceError("格挡减伤", "格挡减伤必须在 50%-75%。");
     }
     if (reduction !== null && mpCost !== null) {
       const expected = blockMpCost(reduction, perfectCounter, counterDamage);
       if (mpCost === expected) {
         pass("格挡蓝耗", `格挡蓝耗 ${mpCost} 与平衡曲线一致。`);
       } else {
-        error("格挡蓝耗", `格挡蓝耗应为 ${expected}，当前为 ${mpCost}。`);
+        balanceError("格挡蓝耗", `格挡蓝耗应为 ${expected}，当前为 ${mpCost}。`);
       }
     }
     if (perfectCounter) {
@@ -631,12 +824,12 @@ function reviewSubmission(
     if (mpCost === expected) {
       pass("闪避蓝耗", `闪避蓝耗 ${mpCost} 与当前模式一致。`);
     } else {
-      error("闪避蓝耗", `闪避蓝耗应为 ${expected}，当前为 ${mpCost ?? "缺失"}。`);
+      balanceError("闪避蓝耗", `闪避蓝耗应为 ${expected}，当前为 ${mpCost ?? "缺失"}。`);
     }
     if (retreat === 100 || retreat === 200) {
       pass("闪避距离", "闪避后撤距离符合 100/200 规则。");
     } else {
-      error("闪避距离", "闪避后撤距离必须为 100 或 200。");
+      balanceError("闪避距离", "闪避后撤距离必须为 100 或 200。");
     }
     if (counter) {
       warning("闪避冲刺反击", "该角色设计了闪避反击，需要人工审核反击伤害与触发描述。");
@@ -690,8 +883,9 @@ function buildOfficialBundle(
   officialNotes: string,
   rosterSlot: S1RosterSlot | null,
 ) {
-  const characterId = asString(officialAssets.character?.id, "unknown_character");
-  const skills = officialAssets.skills;
+  const normalizedOfficialAssets = normalizeOfficialAssetIds(officialAssets);
+  const characterId = asString(normalizedOfficialAssets.character?.id, "unknown_character");
+  const skills = normalizedOfficialAssets.skills;
   const errors = items.filter((item) => item.severity === "error").length;
   const warnings = items.filter((item) => item.severity === "warning").length;
   const baseStatus = errors > 0 ? "blocked" : warnings > 0 ? "manual_review_required" : "base_rules_passed";
@@ -733,16 +927,16 @@ function buildOfficialBundle(
     asset_targets: {
       character: `assets/characters/${characterId}.json`,
       skills: skills.map((skill) => `assets/skills/${asString(skill.id, "unknown_skill")}.json`),
-      passive: isRecord(officialAssets.passive)
-        ? `assets/passives/${asString(officialAssets.passive.id, `${characterId}_passive`)}.json`
+      passive: isRecord(normalizedOfficialAssets.passive)
+        ? `assets/passives/${asString(normalizedOfficialAssets.passive.id, `${characterId}_passive`)}.json`
         : null,
     },
     official_assets: {
-      character: officialAssets.character,
+      character: normalizedOfficialAssets.character,
       skills,
-      passive: officialAssets.passive,
-      combat_design: officialAssets.combat_design,
-      training: officialAssets.training,
+      passive: normalizedOfficialAssets.passive,
+      combat_design: normalizedOfficialAssets.combat_design,
+      training: normalizedOfficialAssets.training,
     },
   };
 }
@@ -836,9 +1030,22 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   );
   const officialAssetsDraft = officialAssetsDraftState.draft;
   const officialAssetsDraftError = officialAssetsDraftState.error;
-  const officialAssetsView = officialAssetsDraft ?? (submission ? createOfficialAssetsDraft(submission) : null);
+  const normalizedOfficialAssetsDraft = useMemo(
+    () => (officialAssetsDraft ? normalizeOfficialAssetIds(officialAssetsDraft) : null),
+    [officialAssetsDraft],
+  );
+  const officialAssetsView = normalizedOfficialAssetsDraft ?? (submission ? createOfficialAssetsDraft(submission) : null);
   const character = officialAssetsView?.character ?? null;
   const characterId = asString(character?.id);
+  const checksumDisplay = isOfficialRevisionSubmission(submission)
+    ? lang === "en" ? "Official revision" : "官方修正版"
+    : !checksum?.available
+      ? t.checksumMissing
+      : checksum.matched
+        ? t.checksumOk
+        : allowsLegacyChecksumMismatch(submission ?? {})
+          ? lang === "en" ? "Legacy accepted" : "历史包放行"
+          : t.checksumBad;
   const skills = officialAssetsView?.skills ?? [];
   const passive = isRecord(officialAssetsView?.passive) ? officialAssetsView.passive : null;
   const training = isRecord(officialAssetsView?.training) ? officialAssetsView.training : null;
@@ -847,14 +1054,14 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       submission && officialAssetsDraft
         ? {
             ...submission,
-            character: officialAssetsDraft.character ?? undefined,
-            skills: officialAssetsDraft.skills,
-            passive: officialAssetsDraft.passive,
-            combat_design: officialAssetsDraft.combat_design,
-            training: officialAssetsDraft.training,
+            character: normalizedOfficialAssetsDraft?.character ?? undefined,
+            skills: normalizedOfficialAssetsDraft?.skills ?? [],
+            passive: normalizedOfficialAssetsDraft?.passive,
+            combat_design: normalizedOfficialAssetsDraft?.combat_design,
+            training: normalizedOfficialAssetsDraft?.training,
           }
         : null,
-    [officialAssetsDraft, submission],
+    [normalizedOfficialAssetsDraft, officialAssetsDraft, submission],
   );
   const effectiveItems = useMemo(
     () =>
@@ -881,16 +1088,20 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   const selectedSlotOccupied = Boolean(selectedRosterSlot?.characterId.trim());
   const canApproveOfficial = errors === 0;
   const canRegisterRoster = Boolean(
-    submission && officialAssetsDraft && !officialAssetsDraftError && isRecord(officialAssetsDraft.character),
+    submission
+      && normalizedOfficialAssetsDraft
+      && !officialAssetsDraftError
+      && isRecord(normalizedOfficialAssetsDraft.character)
+      && asString(normalizedOfficialAssetsDraft.character.id),
   );
 
   const officialBundle = useMemo(
     () =>
       submission
-      && officialAssetsDraft
+      && normalizedOfficialAssetsDraft
         ? buildOfficialBundle(
             submission,
-            officialAssetsDraft,
+            normalizedOfficialAssetsDraft,
             sourcePath,
             checksum,
             effectiveItems,
@@ -902,7 +1113,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
     [
       checksum,
       effectiveItems,
-      officialAssetsDraft,
+      normalizedOfficialAssetsDraft,
       officialDecision,
       officialNotes,
       registeredRosterSlot,
@@ -914,6 +1125,320 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   const canExportOfficialPackage = Boolean(
     officialDecision === "approved" && canApproveOfficial && officialBundle && !officialAssetsDraftError,
   );
+  const hasEditableOfficialDraft = Boolean(submission && normalizedOfficialAssetsDraft);
+  const officialPackageToApply = hasEditableOfficialDraft ? officialBundle : officialPackage;
+  const canApplyOfficialPackage = hasEditableOfficialDraft
+    ? canExportOfficialPackage
+    : Boolean(officialPackage);
+
+  const updateOfficialAssetsDraft = (updater: (draft: OfficialAssetsDraft) => OfficialAssetsDraft) => {
+    const baseDraft = officialAssetsDraft ?? (submission ? createOfficialAssetsDraft(submission) : null);
+    if (!baseDraft) {
+      return;
+    }
+
+    setOfficialAssetsDraftText(formatJson(updater(baseDraft)));
+  };
+
+  const updateOfficialCharacterField = (key: keyof CharacterResource, value: unknown) => {
+    updateOfficialAssetsDraft((draft) => {
+      const nextCharacter = {
+        ...(isRecord(draft.character) ? draft.character : {}),
+        [key]: value,
+      };
+
+      if (key === "id") {
+        const seasonContestantId = normalizeId(asString(value));
+        nextCharacter.id_scope = "season_contestant";
+        nextCharacter.season_contestant_id = seasonContestantId || null;
+        nextCharacter.season_contestant_id_status = seasonContestantId ? "assigned" : "pending_assignment";
+        nextCharacter.permanent_character_id = nextCharacter.permanent_character_id ?? null;
+      }
+
+      return {
+        ...draft,
+        character: nextCharacter as CharacterResource,
+      };
+    });
+  };
+
+  const updateOfficialCharacterNumberField = (key: keyof CharacterResource, value: string) => {
+    const trimmedValue = value.trim();
+    const numericValue = Number(trimmedValue);
+    updateOfficialCharacterField(key, trimmedValue && Number.isFinite(numericValue) ? numericValue : null);
+  };
+
+  const updateOfficialPassive = (nextPassive: Record<string, unknown>) => {
+    updateOfficialAssetsDraft((draft) => {
+      const nextCharacter = isRecord(draft.character)
+        ? {
+            ...draft.character,
+            passive: nextPassive,
+          }
+        : draft.character;
+      const nextCombatDesign = isRecord(draft.combat_design)
+        ? {
+            ...draft.combat_design,
+            passive: nextPassive,
+          }
+        : draft.combat_design;
+
+      return {
+        ...draft,
+        character: nextCharacter as CharacterResource | null,
+        passive: nextPassive,
+        combat_design: nextCombatDesign,
+      };
+    });
+  };
+
+  const updateOfficialPassiveField = (key: string, value: unknown) => {
+    if (!isRecord(passive)) {
+      return;
+    }
+    updateOfficialPassive({
+      ...passive,
+      [key]: value,
+    });
+  };
+
+  const updateOfficialPassiveEffectField = (key: string, value: unknown) => {
+    if (!isRecord(passive)) {
+      return;
+    }
+
+    const effect = isRecord(passive.effect) ? passive.effect : {};
+    updateOfficialPassive({
+      ...passive,
+      effect: {
+        ...effect,
+        [key]: value,
+      },
+    });
+  };
+
+  const updateOfficialPassiveNumberEffectField = (key: string, value: string) => {
+    const trimmedValue = value.trim();
+    const numericValue = Number(trimmedValue);
+    updateOfficialPassiveEffectField(key, trimmedValue && Number.isFinite(numericValue) ? numericValue : null);
+  };
+
+  const updateOfficialSkillField = (skillIndex: number, key: keyof SkillResource, value: unknown) => {
+    updateOfficialAssetsDraft((draft) => {
+      const currentSkill = draft.skills[skillIndex];
+      if (!currentSkill) {
+        return draft;
+      }
+
+      const nextSkill = {
+        ...currentSkill,
+        [key]: value,
+      };
+      const nextSkills = draft.skills.map((skill, index) => (index === skillIndex ? nextSkill : skill));
+      const skillType = asString(currentSkill.type);
+      let nextCombatDesign = draft.combat_design;
+
+      if (skillType && isRecord(nextCombatDesign) && isRecord(nextCombatDesign[skillType])) {
+        nextCombatDesign = {
+          ...nextCombatDesign,
+          [skillType]: {
+            ...(nextCombatDesign[skillType] as Record<string, unknown>),
+            [key]: value,
+          },
+        };
+      }
+
+      return {
+        ...draft,
+        skills: nextSkills,
+        combat_design: nextCombatDesign,
+      };
+    });
+  };
+
+  const updateOfficialSkillNumberField = (skillIndex: number, key: keyof SkillResource, value: string) => {
+    const trimmedValue = value.trim();
+    const numericValue = Number(trimmedValue);
+    updateOfficialSkillField(skillIndex, key, trimmedValue && Number.isFinite(numericValue) ? numericValue : null);
+  };
+
+  const loadOfficialRevision = async (revisionCharacterId: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const parsed = await invoke<unknown>("get_s1_official_revision_package", {
+        characterId: revisionCharacterId,
+      });
+      if (!isApprovedOfficialPackage(parsed)) {
+        throw new Error("Invalid official revision package");
+      }
+
+      const draft = officialAssetsDraftFromPackage(parsed);
+      const revisionSubmission = await normalizeSubmissionPortrait(submissionFromOfficialPackage(parsed));
+      const noChecksum = {
+        available: false,
+        stored: "",
+        calculated: "",
+        matched: false,
+      };
+      const nextRoster = await loadS1Roster();
+      const requestedSlot = asNumber(parsed.roster?.slot);
+      const existingSlot = findS1RosterSlot(nextRoster, revisionCharacterId);
+      const source = isRecord(parsed.source) ? parsed.source : {};
+      const sourceDisplay = asString(source.path, `assets/characters/${revisionCharacterId}.json`);
+
+      setSubmission(revisionSubmission);
+      setOfficialAssetsDraftText(formatJson(draft));
+      setSourcePath(sourceDisplay);
+      setChecksum(noChecksum);
+      setItems(reviewSubmission(revisionSubmission, noChecksum, { skipChecksum: true }));
+      setRoster(nextRoster);
+      setSelectedSlot(requestedSlot ?? existingSlot?.slot ?? getSuggestedRosterSlot(nextRoster, revisionCharacterId));
+      setOfficialDecision("approved");
+      setOfficialNotes(asString(parsed.review?.official_notes, "official_revision"));
+      setOfficialPackage(parsed);
+      setOfficialPackagePath(sourceDisplay);
+      setOverwriteAssets(true);
+      setOfficialImportResult(null);
+      setOfficialImportError("");
+      setStatus(t.packageAccepted);
+    } catch (error) {
+      console.error(error);
+      setStatus(t.packageRejected);
+      setOfficialImportError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  useEffect(() => {
+    const revisionCharacterId = window.sessionStorage.getItem(OFFICIAL_REVISION_REQUEST_KEY);
+    if (!revisionCharacterId) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(OFFICIAL_REVISION_REQUEST_KEY);
+    void loadOfficialRevision(revisionCharacterId);
+  }, []);
+
+  const renderSkillTextField = (skillIndex: number, skill: SkillResource, key: keyof SkillResource, label: string) => (
+    <label className="review-skill-field">
+      <span>{label}</span>
+      <input
+        value={asString(skill[key])}
+        onChange={(event) => updateOfficialSkillField(skillIndex, key, event.target.value)}
+      />
+    </label>
+  );
+
+  const renderSkillNumberField = (
+    skillIndex: number,
+    skill: SkillResource,
+    key: keyof SkillResource,
+    label: string,
+    step = "1",
+  ) => (
+    <label className="review-skill-field">
+      <span>{label}</span>
+      <input
+        type="number"
+        step={step}
+        value={asNumber(skill[key]) ?? ""}
+        onChange={(event) => updateOfficialSkillNumberField(skillIndex, key, event.target.value)}
+      />
+    </label>
+  );
+
+  const renderCharacterTextField = (
+    key: keyof CharacterResource,
+    label: string,
+    options: { multiline?: boolean; wide?: boolean } = {},
+  ) => (
+    <label className={options.wide ? "review-character-field review-character-field-wide" : "review-character-field"}>
+      <span>{label}</span>
+      {options.multiline ? (
+        <textarea
+          value={asString(character?.[key])}
+          onChange={(event) => updateOfficialCharacterField(key, event.target.value)}
+          rows={4}
+        />
+      ) : (
+        <input
+          value={asString(character?.[key])}
+          onChange={(event) => updateOfficialCharacterField(key, event.target.value)}
+        />
+      )}
+    </label>
+  );
+
+  const renderCharacterNumberField = (key: keyof CharacterResource, label: string) => (
+    <label className="review-character-field">
+      <span>{label}</span>
+      <input
+        type="number"
+        value={asNumber(character?.[key]) ?? ""}
+        onChange={(event) => updateOfficialCharacterNumberField(key, event.target.value)}
+      />
+    </label>
+  );
+
+  const renderPassiveTextField = (
+    key: string,
+    label: string,
+    options: { multiline?: boolean; wide?: boolean } = {},
+  ) => (
+    <label className={options.wide ? "review-passive-field review-passive-field-wide" : "review-passive-field"}>
+      <span>{label}</span>
+      {options.multiline ? (
+        <textarea
+          value={asString(passive?.[key])}
+          onChange={(event) => updateOfficialPassiveField(key, event.target.value)}
+          rows={4}
+        />
+      ) : (
+        <input
+          value={asString(passive?.[key])}
+          onChange={(event) => updateOfficialPassiveField(key, event.target.value)}
+        />
+      )}
+    </label>
+  );
+
+  const renderPassiveEffectTextField = (
+    key: string,
+    label: string,
+    options: { multiline?: boolean; wide?: boolean } = {},
+  ) => {
+    const effect = isRecord(passive?.effect) ? passive.effect : {};
+    return (
+      <label className={options.wide ? "review-passive-field review-passive-field-wide" : "review-passive-field"}>
+        <span>{label}</span>
+        {options.multiline ? (
+          <textarea
+            value={asString(effect[key])}
+            onChange={(event) => updateOfficialPassiveEffectField(key, event.target.value)}
+            rows={4}
+          />
+        ) : (
+          <input
+            value={asString(effect[key])}
+            onChange={(event) => updateOfficialPassiveEffectField(key, event.target.value)}
+          />
+        )}
+      </label>
+    );
+  };
+
+  const renderPassiveEffectNumberField = (key: string, label: string) => {
+    const effect = isRecord(passive?.effect) ? passive.effect : {};
+    return (
+      <label className="review-passive-field">
+        <span>{label}</span>
+        <input
+          type="number"
+          value={asNumber(effect[key]) ?? ""}
+          onChange={(event) => updateOfficialPassiveNumberEffectField(key, event.target.value)}
+        />
+      </label>
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -956,7 +1481,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
         exportReviewBundle();
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
-        registerRosterEntry();
+        void registerRosterEntry();
       } else if (e.key === "o" || e.key === "O") {
         e.preventDefault();
         importOfficialPackage();
@@ -1015,9 +1540,14 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
     }
   };
 
-  const registerRosterEntry = () => {
-    if (!submission || !officialAssetsDraft || officialAssetsDraftError) {
+  const registerRosterEntry = async () => {
+    if (!submission || !normalizedOfficialAssetsDraft || officialAssetsDraftError) {
       setStatus(t.officialAssetsInvalid);
+      return;
+    }
+
+    if (!canRegisterRoster) {
+      setStatus(t.officialIdRequired);
       return;
     }
 
@@ -1026,21 +1556,25 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
       return;
     }
 
-    const nextRoster = upsertS1RosterEntry({
-      slot: selectedSlot,
-      characterId: asString(officialAssetsDraft.character?.id, "unknown_character"),
-      characterName: asString(officialAssetsDraft.character?.name, "Unnamed Character"),
-      projectName: asString(officialAssetsDraft.character?.project_name),
-      creator: asString(officialAssetsDraft.character?.creator, "Unknown Creator"),
-      sourcePath,
-      reviewDecision: officialDecision,
-      officialNotes,
-      checksum: checksum?.calculated ?? checksum?.stored ?? "",
-      reviewPackageStatus: reviewState,
-    });
+    try {
+      const nextRoster = await saveS1RosterEntry({
+        slot: selectedSlot,
+        characterId: asString(normalizedOfficialAssetsDraft.character?.id, "unknown_character"),
+        characterName: asString(normalizedOfficialAssetsDraft.character?.name, "Unnamed Character"),
+        projectName: asString(normalizedOfficialAssetsDraft.character?.project_name),
+        creator: asString(normalizedOfficialAssetsDraft.character?.creator, "Unknown Creator"),
+        sourcePath,
+        reviewDecision: officialDecision,
+        officialNotes,
+        checksum: checksum?.calculated ?? checksum?.stored ?? "",
+        reviewPackageStatus: reviewState,
+      });
 
-    setRoster(nextRoster);
-    setStatus(t.registered);
+      setRoster(nextRoster);
+      setStatus(t.registered);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const importOfficialPackage = async () => {
@@ -1078,16 +1612,16 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
   };
 
   const applyOfficialPackage = async () => {
-    if (!officialPackage) {
-      setOfficialImportError(t.officialPackageMissing);
+    if (!officialPackageToApply || !canApplyOfficialPackage) {
+      setOfficialImportError(hasEditableOfficialDraft ? t.exportDisabledHint : t.officialPackageMissing);
       return;
     }
 
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const result = await invoke<OfficialImportResult>("import_official_package", {
-        payload: officialPackage,
-        overwrite: overwriteAssets,
+        payload: officialPackageToApply,
+        overwrite: overwriteAssets || hasEditableOfficialDraft,
       });
 
       setOfficialImportResult(result);
@@ -1167,7 +1701,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
         </div>
         <div className="review-inline-actions">
           <button type="button" onClick={importOfficialPackage}>{t.importOfficial}</button>
-          <button type="button" onClick={applyOfficialPackage} disabled={!officialPackage}>{t.applyOfficial}</button>
+          <button type="button" onClick={applyOfficialPackage} disabled={!canApplyOfficialPackage}>{t.applyOfficial}</button>
         </div>
       </div>
 
@@ -1252,10 +1786,10 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
           </div>
           <div className="review-actions">
             <button type="button" onClick={importSubmission}>{t.import}</button>
-            <button type="button" onClick={registerRosterEntry} disabled={!canRegisterRoster}>{t.registerRoster}</button>
+            <button type="button" onClick={() => void registerRosterEntry()} disabled={!canRegisterRoster}>{t.registerRoster}</button>
             <button type="button" onClick={exportReviewBundle} disabled={!canExportOfficialPackage}>{t.export}</button>
             <button type="button" onClick={importOfficialPackage}>{t.importOfficial}</button>
-            <button type="button" onClick={applyOfficialPackage} disabled={!officialPackage}>{t.applyOfficial}</button>
+            <button type="button" onClick={applyOfficialPackage} disabled={!canApplyOfficialPackage}>{t.applyOfficial}</button>
             <button type="button" onClick={goBack}>{t.back}</button>
           </div>
         </header>
@@ -1327,7 +1861,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
                   />
                 </label>
 
-                <button className="review-register-button" type="button" onClick={registerRosterEntry} disabled={!canRegisterRoster}>
+                <button className="review-register-button" type="button" onClick={() => void registerRosterEntry()} disabled={!canRegisterRoster}>
                   {t.registerRoster}
                 </button>
                 {!canExportOfficialPackage && <p className="review-hint">{t.exportDisabledHint}</p>}
@@ -1343,13 +1877,7 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
                   <div><dt>rules</dt><dd>{asString(submission.ruleset_version, "-")}</dd></div>
                   <div>
                     <dt>checksum</dt>
-                    <dd>
-                      {!checksum?.available
-                        ? t.checksumMissing
-                        : checksum.matched
-                          ? t.checksumOk
-                          : t.checksumBad}
-                    </dd>
+                    <dd>{checksumDisplay}</dd>
                   </div>
                 </dl>
               </section>
@@ -1371,14 +1899,15 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
               <div className="review-summary-grid">
                 <section className="review-panel">
                   <h2>{t.character}</h2>
-                  <dl className="review-meta">
-                    <div><dt>ID</dt><dd>{asString(character?.id, "-")}</dd></div>
-                    <div><dt>Project</dt><dd>{asString(character?.project_name, "-")}</dd></div>
-                    <div><dt>Name</dt><dd>{asString(character?.name, "-")}</dd></div>
-                    <div><dt>Creator</dt><dd>{asString(character?.creator, "-")}</dd></div>
-                    <div><dt>HP / MP</dt><dd>{String(asNumber(character?.hp) ?? "-")} / {String(asNumber(character?.mp) ?? "-")}</dd></div>
-                  </dl>
-                  <p className="review-description">{asString(character?.description, t.empty)}</p>
+                  <div className="review-character-editor-grid">
+                    {renderCharacterTextField("id", t.officialId, { wide: true })}
+                    {renderCharacterTextField("project_name", t.projectName)}
+                    {renderCharacterTextField("name", t.characterName)}
+                    {renderCharacterTextField("creator", t.creator)}
+                    {renderCharacterNumberField("hp", t.hp)}
+                    {renderCharacterNumberField("mp", t.mp)}
+                    {renderCharacterTextField("description", t.description, { multiline: true, wide: true })}
+                  </div>
                 </section>
 
                 <section className="review-panel">
@@ -1389,22 +1918,56 @@ export default function ReviewPage({ goBack }: ReviewPageProps) {
 
               <section className="review-panel">
                 <h2>{t.skills}</h2>
-                <div className="review-skill-grid">
-                  {skills.map((skill) => (
-                    <article className="review-skill" key={asString(skill.id)}>
-                      <strong>{asString(skill.name, asString(skill.id, "-"))}</strong>
-                      <span>{asString(skill.type, "-")}</span>
-                      <em>
-                        MP {String(asNumber(skill.mp_cost) ?? "-")} / DMG {String(asNumber(skill.damage) ?? "-")}
-                      </em>
-                    </article>
-                  ))}
+                <div className="review-skill-editor-grid">
+                  {skills.map((skill, index) => {
+                    const skillType = asString(skill.type);
+                    return (
+                      <article className="review-skill-editor" key={`${asString(skill.id, "skill")}-${index}`}>
+                        <div className="review-skill-editor-head">
+                          <strong>{asString(skill.name, asString(skill.id, "-"))}</strong>
+                          <span>{skillType || "-"}</span>
+                        </div>
+                        <div className="review-skill-fields">
+                          {renderSkillTextField(index, skill, "name", t.skillName)}
+                          {renderSkillNumberField(index, skill, "mp_cost", t.mpCost, "1")}
+                          {(skillType === "melee" || skillType === "ranged") &&
+                            renderSkillNumberField(index, skill, "damage", t.damage, "1")}
+                          {skillType === "ranged" && (
+                            <>
+                              {renderSkillNumberField(index, skill, "hit_rate", t.hitRate, "0.01")}
+                              {renderSkillNumberField(index, skill, "range", t.range, "1")}
+                            </>
+                          )}
+                          {skillType === "block" &&
+                            renderSkillNumberField(index, skill, "damage_reduction", t.reduction, "0.01")}
+                          {skillType === "dodge" &&
+                            renderSkillNumberField(index, skill, "retreat_distance", t.retreat, "1")}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 
               <section className="review-panel">
                 <h2>{t.passive}</h2>
-                <pre>{passive ? formatPreviewJson(passive) : t.empty}</pre>
+                {passive ? (
+                  <div className="review-passive-editor">
+                    <p>{t.passiveRuntimeNote}</p>
+                    <div className="review-passive-editor-grid">
+                      {renderPassiveTextField("name", t.skillName)}
+                      {renderPassiveEffectTextField("category", t.effectCategory)}
+                      {renderPassiveEffectTextField("name", t.effectName)}
+                      {renderPassiveEffectTextField("trigger_condition", t.triggerCondition, { wide: true })}
+                      {renderPassiveEffectNumberField("value", t.passiveValue)}
+                      {renderPassiveEffectTextField("value_unit", t.valueUnit)}
+                      {renderPassiveEffectTextField("description", t.effectDescription, { multiline: true, wide: true })}
+                      {renderPassiveTextField("description", t.passiveDescription, { multiline: true, wide: true })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="review-description">{t.empty}</p>
+                )}
               </section>
 
               <section className="review-panel">

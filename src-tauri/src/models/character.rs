@@ -45,6 +45,8 @@ pub struct CharacterPassive {
     pub single_effect: bool,
     pub effect: CharacterPassiveEffect,
     pub official_review_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_status: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
 }

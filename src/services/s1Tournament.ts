@@ -43,6 +43,21 @@ export interface S1Tournament {
   };
 }
 
+export interface S1TournamentSeedResult {
+  status: string;
+  capacity: number;
+  slotOrder: number[];
+  updatedAt: string;
+}
+
+export const S1_TOURNAMENT_REVEAL_STATUSES = ["seeded", "running", "completed"] as const;
+
+export function isS1TournamentSeeded(tournament: Pick<S1Tournament, "status">) {
+  return S1_TOURNAMENT_REVEAL_STATUSES.includes(
+    tournament.status as (typeof S1_TOURNAMENT_REVEAL_STATUSES)[number],
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -211,4 +226,9 @@ export async function loadS1Tournament(): Promise<S1Tournament> {
   } catch {
     return createDefaultS1Tournament();
   }
+}
+
+export async function seedS1TournamentBracket(): Promise<S1TournamentSeedResult> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<S1TournamentSeedResult>("seed_s1_tournament_bracket");
 }
